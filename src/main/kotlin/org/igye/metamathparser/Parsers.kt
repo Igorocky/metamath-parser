@@ -7,74 +7,42 @@ data class ParserInput(val text:String, val begin:Int) {
     fun charAtRel(i:Int): Char = text[toAbsolute(i)]
     fun charAt(i:Int): Char = text[i]
     fun proceed(n:Int) = this.copy(begin = begin+n)
-    fun currPositionStr():String = begin.toString()
+    fun proceedTo(n:Int) = this.copy(begin = n)
+    fun currPositionStr():String = "'${text.substring(begin, 20)}...'"
     fun toAbsolute(i:Int) = begin+i
 }
 
 data class ParserOutput<T>(val result:T, val end:Int)
 
-data class NonLabeledSequence(val beginIdx:Int, val seqType:Char, val symbols:List<String>)
-data class LabeledSequence(val beginIdx:Int, val label:String, val seqType:Char, val symbols:List<String>)
-data class ConstantStmt(val beginIdx:Int, val symbols:List<String>)
-data class VariableStmt(val beginIdx:Int, val symbols:List<String>)
-data class DisjointStmt(val beginIdx:Int, val symbols:List<String>)
-data class FloatingStmt(val beginIdx:Int, val label:String, val typecode:String, val variable:String)
+data class Comment(val text:String, val beginIdx:Int)
+data class SequenceOfSymbols(val seqType:Char, val symbols:List<String>, val beginIdx:Int)
+data class LabeledSequenceOfSymbols(val label:String, val sequence:SequenceOfSymbols, val beginIdx:Int)
 
 object Parsers {
-    fun parseConstantStmt(inp:ParserInput): ParserOutput<ConstantStmt> {
-        if (inp.charAtRel(0) != '$' || inp.charAtRel(1) != 'c') {
-            throw MetamathParserException("Cannot parse list of constants at ${inp.currPositionStr()}")
+
+    fun parseComment(inp:ParserInput): ParserOutput<Comment> {
+        if (inp.charAtRel(0) != '$' || inp.charAtRel(1) != '(') {
+            throw MetamathParserException("Cannot parse Comment at ${inp.currPositionStr()}")
         }
-        val listOfSymbols = parseListOfSymbols(inp.proceed(2))
+        val commentText = collectWhile(inp.proceed(2)) { str, i -> !(str[i] == '$' && str[i + 1] == ')') }
         return ParserOutput(
-            result = ConstantStmt(symbols = listOfSymbols.result, beginIdx = inp.begin),
-            end = listOfSymbols.end
+            result = Comment(text = commentText.result, beginIdx = inp.begin),
+            end = commentText.end+2
         )
     }
 
-    fun parseVariableStmt(inp:ParserInput): ParserOutput<VariableStmt> {
-        if (inp.charAtRel(0) != '$' || inp.charAtRel(1) != 'v') {
-            throw MetamathParserException("Cannot parse list of variables at ${inp.currPositionStr()}")
+    fun parseSequenceOfSymbols(inp:ParserInput): ParserOutput<SequenceOfSymbols> {
+        if (inp.charAtRel(0) != '$') {
+            throw MetamathParserException("Cannot parse SequenceOfSymbols at ${inp.currPositionStr()}")
+        }
+        val seqType = inp.charAtRel(1)
+        if (!inp.charAtRel(2).isWhitespace()) {
+            throw MetamathParserException("A whitespace was expected between the beginning of a sequence at its first element at ${inp.currPositionStr()}")
         }
         val listOfSymbols = parseListOfSymbols(inp.proceed(2))
         return ParserOutput(
-            result = VariableStmt(symbols = listOfSymbols.result, beginIdx = inp.begin),
-            end = listOfSymbols.end
-        )
-    }
-
-    fun parseDisjointStmt(inp:ParserInput): ParserOutput<DisjointStmt> {
-        if (inp.charAtRel(0) != '$' || inp.charAtRel(1) != 'd') {
-            throw MetamathParserException("Cannot parse DisjointStmt at ${inp.currPositionStr()}")
-        }
-        val listOfSymbols = parseListOfSymbols(inp.proceed(2))
-        return ParserOutput(
-            result = DisjointStmt(symbols = listOfSymbols.result, beginIdx = inp.begin),
-            end = listOfSymbols.end
-        )
-    }
-
-    fun parseLabeledSequence(inp:ParserInput): ParserOutput<LabeledSequence> {
-        val labelParserOutput = parsePrintable(inp)
-        if (labelParserOutput.result.isEmpty()) {
-            throw MetamathParserException("A label was expected at ${inp.currPositionStr()}")
-        }
-        val spaceParserOutput = parseWhitespace(inp.proceed(labelParserOutput.result.length))
-        if (spaceParserOutput.result.isEmpty()) {
-            throw MetamathParserException("A whitespace was expected between the label and the beginning of a list at ${inp.currPositionStr()}")
-        }
-        if (inp.charAt(spaceParserOutput.end+1) != '$') {
-            throw MetamathParserException("Cannot parse labeled sequence at ${inp.currPositionStr()}")
-        }
-        val seqType = inp.charAt(spaceParserOutput.end+2)
-        if (!inp.charAt(spaceParserOutput.end+3).isWhitespace()) {
-            throw MetamathParserException("A whitespace was expected between the beginning of a list at its first element at ${inp.currPositionStr()}")
-        }
-        val listOfSymbols = parseListOfSymbols(inp.proceed(spaceParserOutput.end+3-inp.begin))
-        return ParserOutput(
-            result = LabeledSequence(
+            result = SequenceOfSymbols(
                 beginIdx = inp.begin,
-                label = labelParserOutput.result,
                 seqType = seqType,
                 symbols = listOfSymbols.result
             ),
@@ -82,24 +50,45 @@ object Parsers {
         )
     }
 
+    fun parseLabeledSequence(inp:ParserInput): ParserOutput<LabeledSequenceOfSymbols> {
+        val label = parsePrintable(inp)
+        if (label.result.isEmpty()) {
+            throw MetamathParserException("A label was expected at ${inp.currPositionStr()}")
+        }
+        val space = parseWhitespace(inp.proceed(label.result.length))
+        if (space.result.isEmpty()) {
+            throw MetamathParserException("A whitespace was expected between the label and the beginning of a sequence at ${inp.currPositionStr()}")
+        }
+        if (inp.charAt(space.end+1) != '$') {
+            throw MetamathParserException("Cannot parse labeled sequence at ${inp.currPositionStr()}")
+        }
+        val sequenceOfSymbols = parseSequenceOfSymbols(inp.proceedTo(space.end + 1))
+        return ParserOutput(
+            result = LabeledSequenceOfSymbols(
+                label = label.result,
+                sequence = sequenceOfSymbols.result,
+                beginIdx = inp.begin
+            ),
+            end = sequenceOfSymbols.end
+        )
+    }
+
     private fun parsePrintable(inp:ParserInput): ParserOutput<String> {
-        return parseWhile(inp) {!it.isWhitespace()}
+        return collectWhile(inp) { str, i -> !str[i].isWhitespace()}
     }
 
     private fun parseWhitespace(inp:ParserInput): ParserOutput<String> {
-        return parseWhile(inp) {it.isWhitespace()}
+        return collectWhile(inp) {str, i -> str[i].isWhitespace()}
     }
 
-    private fun parseWhile(inp:ParserInput, predicate: (Char) -> Boolean): ParserOutput<String> {
+    private fun collectWhile(inp:ParserInput, predicate: (String, Int) -> Boolean): ParserOutput<String> {
         val result = StringBuffer()
-        var i = 0
-        var currChar = inp.charAtRel(i)
-        while (predicate(currChar)) {
-            result.append(currChar)
+        var i = inp.begin
+        while (predicate(inp.text, i)) {
+            result.append(inp.charAt(i))
             i += 1
-            currChar = inp.charAtRel(i)
         }
-        return ParserOutput(result = result.toString(), end = inp.toAbsolute(i-1))
+        return ParserOutput(result = result.toString(), end = i-1)
     }
 
     private fun parseListOfSymbols(inp:ParserInput): ParserOutput<List<String>> {
