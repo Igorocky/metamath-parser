@@ -2,20 +2,27 @@ package org.igye.metamathparser
 
 import java.util.*
 import kotlin.collections.ArrayList
+import kotlin.math.min
 
 data class ParserInput(val text:String, val begin:Int) {
     fun charAtRel(i:Int): Char = text[toAbsolute(i)]
     fun charAt(i:Int): Char = text[i]
     fun proceed(n:Int) = this.copy(begin = begin+n)
     fun proceedTo(n:Int) = this.copy(begin = n)
-    fun currPositionStr():String = "'${text.substring(begin, 20)}...'"
+    fun currPositionStr():String {
+        val lengthToShow = 20
+        val ellipsis = if (text.length < begin+lengthToShow) "" else "..."
+        return "'${text.substring(begin, min(text.length, begin+lengthToShow))}${ellipsis}'"
+    }
+    fun currPositionStr(i:Int):String = this.proceedTo(i).currPositionStr()
+    fun currPositionStrRel(i:Int):String = this.proceedTo(begin+i).currPositionStr()
     fun toAbsolute(i:Int) = begin+i
 }
 
 data class ParserOutput<T>(val result:T, val end:Int)
 
 data class Comment(val text:String, val beginIdx:Int)
-data class SequenceOfSymbols(val seqType:Char, val symbols:List<String>, val beginIdx:Int)
+data class SequenceOfSymbols(val seqType:Char, val symbols:List<String>, val proof:List<String>?, val beginIdx:Int)
 data class LabeledSequenceOfSymbols(val label:String, val sequence:SequenceOfSymbols, val beginIdx:Int)
 
 object Parsers {
@@ -40,17 +47,23 @@ object Parsers {
             throw MetamathParserException("A whitespace was expected between the beginning of a sequence at its first element at ${inp.currPositionStr()}")
         }
         val listOfSymbols = parseListOfSymbols(inp.proceed(2))
+        val proof = if (inp.charAt(listOfSymbols.end) == '=') {
+            parseSequenceOfSymbols(inp.proceedTo(listOfSymbols.end-1))
+        } else {
+            null
+        }
         return ParserOutput(
             result = SequenceOfSymbols(
                 beginIdx = inp.begin,
                 seqType = seqType,
-                symbols = listOfSymbols.result
+                symbols = listOfSymbols.result,
+                proof = proof?.result?.symbols
             ),
-            end = listOfSymbols.end
+            end = proof?.end?:listOfSymbols.end
         )
     }
 
-    fun parseLabeledSequence(inp:ParserInput): ParserOutput<LabeledSequenceOfSymbols> {
+    fun parseLabeledSequenceOfSymbols(inp:ParserInput): ParserOutput<LabeledSequenceOfSymbols> {
         val label = parsePrintable(inp)
         if (label.result.isEmpty()) {
             throw MetamathParserException("A label was expected at ${inp.currPositionStr()}")
@@ -108,8 +121,8 @@ object Parsers {
             i += 1
             currChar = inp.charAtRel(i)
         }
-        if (inp.charAtRel(i+1) != '.') {
-            throw MetamathParserException("A list of symbols must end with '$.' at ${inp.currPositionStr()}")
+        if (inp.charAtRel(i+1) != '.' && inp.charAtRel(i+1) != '=') {
+            throw MetamathParserException("A list of symbols must end with '$.' or '$=' at ${inp.currPositionStrRel(i)}")
         }
         if (symbols.isEmpty()) {
             throw MetamathParserException("A list of symbols is expected to have at least one element at ${inp.currPositionStr()}")
