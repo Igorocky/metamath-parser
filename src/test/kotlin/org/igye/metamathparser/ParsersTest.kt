@@ -96,15 +96,12 @@ internal class ParsersTest {
     }
 
     @Test
-    fun traverseBlock_traverses_metamath_file_correctly() {
+    fun traverseMetamathFile_traverses_metamath_file_correctly() {
         //given
-        val (comments: List<Comment>, nonComments: List<NonComment>) = Parsers.extractComments(Utils.readStringFromClassPath("/demo0.mm"))
         val expressins = ArrayList<List<String>>()
 
         //when
-        Parsers.traverseBlock(
-            inp = ParserInput(text = nonComments.asSequence().map { it.text }.joinToString(separator = " "), begin = 0),
-        ) { ctx, expr ->
+        Parsers.traverseMetamathFile(text = Utils.readStringFromClassPath("/demo0.mm")) { ctx, expr ->
             expressins.add(
                 when (expr) {
                     is SequenceOfSymbols -> expr.symbols

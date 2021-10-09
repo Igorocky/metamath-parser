@@ -29,7 +29,18 @@ data class LabeledSequenceOfSymbols(val label:String, val sequence:SequenceOfSym
 
 object Parsers {
 
-    fun traverseBlock(
+    fun traverseMetamathFile(
+        text:String,
+        exprProc: (MetamathContext,Expression) -> MetamathContext
+    ):Map<String,Assertion> {
+        val (_, code: List<NonComment>) = extractComments(text)
+        return traverseBlock(
+            inp = ParserInput(text = code.asSequence().map { it.text }.joinToString(separator = " "), begin = 0),
+            exprProc = exprProc
+        ).result
+    }
+
+    private fun traverseBlock(
         inp:ParserInput,
         context:MetamathContext = MetamathContext(),
         exprProc: (MetamathContext,Expression) -> MetamathContext
