@@ -21,11 +21,53 @@ data class ParserInput(val text:String, val begin:Int) {
 
 data class ParserOutput<T>(val result:T, val end:Int)
 
-data class Comment(val text:String, val beginIdx:Int)
+data class Comment(val text:String, val beginIdx:Int, val endIdx:Int)
+data class NonComment(val text:String, val beginIdx:Int, val endIdx:Int)
 data class SequenceOfSymbols(val seqType:Char, val symbols:List<String>, val proof:List<String>?, val beginIdx:Int)
 data class LabeledSequenceOfSymbols(val label:String, val sequence:SequenceOfSymbols, val beginIdx:Int)
 
 object Parsers {
+
+    fun extractComments(text: String): Pair<List<Comment>,List<NonComment>> {
+        val comments = ArrayList<Comment>()
+        val nonComments = ArrayList<NonComment>()
+        var idx = 0
+        while (idx < text.length) {
+            while (idx < text.length && text[idx].isWhitespace()) {
+                idx++
+            }
+            if (!(idx < text.length)) {
+                break
+            }
+
+            if (idx+1 < text.length && text[idx] == '$' && text[idx+1] == '(') {
+                val comment = parseComment(ParserInput(text, idx))
+                comments.add(comment.result)
+                idx = comment.end + 1
+            } else {
+                val beginOfNonCommentIdx = idx
+                while (idx < text.length && !(idx+1 < text.length && text[idx] == '$' && text[idx+1] == '(')) {
+                    idx++
+                }
+                if (beginOfNonCommentIdx < idx) {
+                    nonComments.add(NonComment(
+                        text = text.substring(beginOfNonCommentIdx,idx),
+                        beginIdx = beginOfNonCommentIdx,
+                        endIdx = idx-1
+                    ))
+                }
+            }
+        }
+        return Pair(comments, nonComments)
+    }
+
+    private fun skipWhitespace(text:String, begin:Int): Int {
+        var i = begin
+        while (i < text.length && text[i].isWhitespace()) {
+            i++
+        }
+        return i
+    }
 
     fun parseComment(inp:ParserInput): ParserOutput<Comment> {
         if (inp.charAtRel(0) != '$' || inp.charAtRel(1) != '(') {
@@ -33,7 +75,7 @@ object Parsers {
         }
         val commentText = collectWhile(inp.proceed(2)) { str, i -> !(str[i] == '$' && str[i + 1] == ')') }
         return ParserOutput(
-            result = Comment(text = commentText.result, beginIdx = inp.begin),
+            result = Comment(text = commentText.result, beginIdx = inp.begin, endIdx = commentText.end+2),
             end = commentText.end+2
         )
     }

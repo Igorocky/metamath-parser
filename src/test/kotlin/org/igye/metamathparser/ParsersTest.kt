@@ -1,7 +1,6 @@
 package org.igye.metamathparser
 
-import org.junit.Assert.assertEquals
-import org.junit.Assert.assertNull
+import org.junit.Assert.*
 import org.junit.Test
 
 
@@ -54,7 +53,47 @@ internal class ParsersTest {
         //then
         val comment = parserOutput.result
         assertEquals(0, comment.beginIdx)
+        assertEquals(23, comment.endIdx)
         assertEquals(23, parserOutput.end)
         assertEquals(" demo0.mm  1-Jan-04 ", comment.text)
     }
+
+    @Test
+    fun extractComments_separates_comments_and_regular_text() {
+        //when
+        val (comments: List<Comment>, nonComments: List<NonComment>) = Parsers.extractComments(Utils.readStringFromClassPath("/demo0.mm"))
+
+        //then
+        val expectedComments = listOf(
+            " demo0.mm  1-Jan-04 ",
+            "\n" +
+                    "                           ~~ PUBLIC DOMAIN ~~\n" +
+                    "This work is waived of all rights, including copyright, according to the CC0\n" +
+                    "Public Domain Dedication.  http://creativecommons.org/publicdomain/zero/1.0/\n" +
+                    "\n" +
+                    "Norman Megill - email: nm at alum.mit.edu\n" +
+                    "\n",
+            " This file is the introductory formal system example described\n" +
+                    "   in Chapter 2 of the Meamath book. ",
+            " Declare the constant symbols we will use ",
+            " Declare the metavariables we will use ",
+            " Specify properties of the metavariables ",
+            " Define \"term\" (part 1) ",
+            " Define \"term\" (part 2) ",
+            " Define \"wff\" (part 1) ",
+            " Define \"wff\" (part 2) ",
+            " State axiom a1 ",
+            " State axiom a2 ",
+            " Define the modus ponens inference rule ",
+            " Prove a theorem ",
+            " Here is its proof: ",
+            " A theorem with invalid proof (two proof steps were swapped in comparison to the previous theorem) ",
+            " Here is its proof: ",
+        )
+        assertEquals(expectedComments.size, comments.size)
+        val actualComments = comments.map { it.text.filter { ch -> ch != '\r' } }
+        assertEquals(expectedComments, actualComments)
+    }
+
+
 }
