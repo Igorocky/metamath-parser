@@ -95,5 +95,49 @@ internal class ParsersTest {
         assertEquals(expectedComments, actualComments)
     }
 
+    @Test
+    fun traverseBlock_traverses_metamath_file_correctly() {
+        //given
+        val (comments: List<Comment>, nonComments: List<NonComment>) = Parsers.extractComments(Utils.readStringFromClassPath("/demo0.mm"))
+        val expressins = ArrayList<List<String>>()
+
+        //when
+        Parsers.traverseBlock(
+            inp = ParserInput(text = nonComments.asSequence().map { it.text }.joinToString(separator = " "), begin = 0),
+        ) { ctx, expr ->
+            expressins.add(
+                when (expr) {
+                    is SequenceOfSymbols -> expr.symbols
+                    is LabeledSequenceOfSymbols -> listOf("<<${expr.label}:${expr.sequence.seqType}>>", *expr.sequence.symbols.toTypedArray())
+                    else -> throw MetamathParserException()
+                }
+            )
+            ctx
+        }
+
+        //then
+        val expectedExpressions: List<List<String>> = listOf(
+            "0 + = -> ( ) term wff |-",
+            "t r s P Q",
+            "<<tt:f>> term t",
+            "<<tr:f>> term r",
+            "<<ts:f>> term s",
+            "<<wp:f>> wff P",
+            "<<wq:f>> wff Q",
+            "<<tze:a>> term 0",
+            "<<tpl:a>> term ( t + r )",
+            "<<weq:a>> wff t = r",
+            "<<wim:a>> wff ( P -> Q )",
+            "<<a1:a>> |- ( t = r -> ( t = s -> r = s ) )",
+            "<<a2:a>> |- ( t + 0 ) = t",
+            "<<min:e>> |- P",
+            "<<maj:e>> |- ( P -> Q )",
+            "<<mp:a>> |- Q",
+            "<<th1:p>> |- t = t",
+            "<<th2:p>> |- t = t",
+        ).map { it.split(' ') }
+        assertEquals(expectedExpressions, expressins)
+    }
+
 
 }

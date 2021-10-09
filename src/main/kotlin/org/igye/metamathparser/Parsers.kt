@@ -23,10 +23,55 @@ data class ParserOutput<T>(val result:T, val end:Int)
 
 data class Comment(val text:String, val beginIdx:Int, val endIdx:Int)
 data class NonComment(val text:String, val beginIdx:Int, val endIdx:Int)
-data class SequenceOfSymbols(val seqType:Char, val symbols:List<String>, val proof:List<String>?, val beginIdx:Int)
-data class LabeledSequenceOfSymbols(val label:String, val sequence:SequenceOfSymbols, val beginIdx:Int)
+interface Expression
+data class SequenceOfSymbols(val seqType:Char, val symbols:List<String>, val proof:List<String>?, val beginIdx:Int): Expression
+data class LabeledSequenceOfSymbols(val label:String, val sequence:SequenceOfSymbols, val beginIdx:Int): Expression
 
 object Parsers {
+
+    fun traverseBlock(
+        inp:ParserInput,
+        context:MetamathContext = MetamathContext(),
+        exprProc: (MetamathContext,Expression) -> MetamathContext
+    ):ParserOutput<Map<String,Assertion>> {
+        var idx = inp.begin
+        val text = inp.text
+        var ctx = context
+        while (true) {
+            while (idx < text.length && text[idx].isWhitespace()) {
+                idx++
+            }
+            if (!(idx < text.length)) {
+                return ParserOutput(result = ctx.assertions, end = idx-1)
+            }
+
+            if (idx+1 < text.length) {
+                if (text[idx] == '$') {
+                    if (text[idx+1] == '{') {
+                        val assertionsFromBlock = traverseBlock(
+                            inp = inp.proceedTo(idx + 2),
+                            context = ctx,
+                            exprProc = exprProc
+                        )
+                        ctx = ctx.copy(assertions = ctx.assertions.plus(assertionsFromBlock.result))
+                        idx = assertionsFromBlock.end+1
+                    } else if (text[idx+1] == '}') {
+                        return ParserOutput(result = ctx.assertions, end = idx+1)
+                    } else {
+                        val sequenceOfSymbols = parseSequenceOfSymbols(inp.proceedTo(idx))
+                        ctx = exprProc(ctx, sequenceOfSymbols.result)
+                        idx = sequenceOfSymbols.end+1
+                    }
+                } else {
+                    val sequenceOfSymbols = parseLabeledSequenceOfSymbols(inp.proceedTo(idx))
+                    ctx = exprProc(ctx, sequenceOfSymbols.result)
+                    idx = sequenceOfSymbols.end+1
+                }
+            } else {
+                throw MetamathParserException()
+            }
+        }
+    }
 
     fun extractComments(text: String): Pair<List<Comment>,List<NonComment>> {
         val comments = ArrayList<Comment>()
@@ -59,14 +104,6 @@ object Parsers {
             }
         }
         return Pair(comments, nonComments)
-    }
-
-    private fun skipWhitespace(text:String, begin:Int): Int {
-        var i = begin
-        while (i < text.length && text[i].isWhitespace()) {
-            i++
-        }
-        return i
     }
 
     fun parseComment(inp:ParserInput): ParserOutput<Comment> {
