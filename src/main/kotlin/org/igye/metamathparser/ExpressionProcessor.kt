@@ -20,8 +20,9 @@ object ExpressionProcessor: ((MetamathContext,Expression) -> MetamathContext) {
     }
 
     private fun processTheorem(ctx: MetamathContext, expr: LabeledSequenceOfSymbols): MetamathContext {
-        verify(expr.sequence, ctx)
-        return ctx.addAssertion(expr.label, createAssertion(ctx, expr))
+        val theorem = createAssertion(ctx, expr)
+        verify(theorem, ctx)
+        return ctx.addAssertion(expr.label, theorem)
     }
 
     private fun createAssertion(ctx: MetamathContext, expr: LabeledSequenceOfSymbols): Assertion {
@@ -50,23 +51,105 @@ object ExpressionProcessor: ((MetamathContext,Expression) -> MetamathContext) {
         return result
     }
 
-    private fun verify(theorem: SequenceOfSymbols, ctx: MetamathContext): StackNode {
+    private fun verify(theorem: Assertion, ctx: MetamathContext): StackNode {
         val proofStack = ProofStack()
-        for (label in theorem.uncompressedProof!!) {
-            val hypothesis = ctx.hypotheses[label]
-            if (hypothesis != null) {
-                proofStack.apply(hypothesis.sequence)
-            } else {
-                proofStack.apply(ctx.assertions[label]!!)
-            }
+        if (theorem.assertion.sequence.uncompressedProof != null) {
+            eval(theorem.assertion.sequence.uncompressedProof, proofStack, ctx)
+        } else {
+            eval(
+                compressedProof = theorem.assertion.sequence.compressedProof!!,
+                mandatoryHypotheses = theorem.hypotheses.map { it.sequence },
+                proofStack = proofStack,
+                ctx = ctx
+            )
         }
         if (proofStack.size() != 1) {
             throw MetamathParserException("proofStack.size() != 1")
         }
         val result: StackNode = proofStack.get(0)
-        if (theorem.symbols != result.value) {
+        if (theorem.assertion.sequence.symbols != result.value) {
             throw MetamathParserException("theorem.symbols != result.value")
         }
         return result
+    }
+
+    private fun eval(uncompressedProof:List<String>, proofStack:ProofStack, ctx: MetamathContext) {
+        for (label in uncompressedProof) {
+            apply(label, proofStack, ctx)
+        }
+    }
+
+    private fun eval(
+        compressedProof:CompressedProof,
+        mandatoryHypotheses:List<SequenceOfSymbols>,
+        proofStack:ProofStack,
+        ctx: MetamathContext
+    ) {
+        val args = ArrayList<Any>(mandatoryHypotheses)
+        compressedProof.labels.forEach { args.add(ctx.hypotheses[it]?.sequence?:ctx.assertions[it]!!) }
+        val proof: List<String> = splitEncodedProof(compressedProof.proof)
+
+        for (step in proof) {
+            if ("Z".equals(step)) {
+                args.add(proofStack.get(proofStack.size()-1))
+            } else {
+                val arg = args[strToInt(step)-1]
+                if (arg is StackNode) {
+                    proofStack.add(arg)
+                } else if (arg is SequenceOfSymbols) {
+                    proofStack.apply(arg)
+                } else {
+                    proofStack.apply((arg as Assertion))
+                }
+            }
+        }
+    }
+
+    private fun apply(label:String, proofStack:ProofStack, ctx: MetamathContext) {
+        val hypothesis: LabeledSequenceOfSymbols? = ctx.hypotheses[label]
+        if (hypothesis != null) {
+            proofStack.apply(hypothesis.sequence)
+        } else {
+            proofStack.apply(ctx.assertions[label]!!)
+        }
+    }
+
+    fun splitEncodedProof(proofStr: String): List<String> {
+        val result = ArrayList<String>()
+        val sb = StringBuilder()
+        for (i in 0 until proofStr.length) {
+            val c = proofStr[i]
+            if (c == 'Z') {
+                result.add("Z")
+            } else {
+                sb.append(c)
+                if ('A' <= c && c <= 'T') {
+                    result.add(sb.toString())
+                    sb.setLength(0)
+                }
+            }
+        }
+        if (sb.length > 0) {
+            throw MetamathParserException("sb.length() > 0")
+        }
+        return result
+    }
+
+    fun strToInt(str: String): Int {
+        var result = 0
+        var base = 1
+        for (i in str.length - 2 downTo 0) {
+            result += base * charToInt(str[i])
+            base *= 5
+        }
+        return result * 20 + charToInt(str[str.length - 1])
+    }
+
+    private fun charToInt(c: Char): Int {
+        return if ('A' <= c && c <= 'T') {
+            c.code - 64 //65 is A
+        } else {
+            c.code - 84 //85 is U
+        }
     }
 }
