@@ -1,5 +1,6 @@
 package org.igye.metamathparser
 
+import java.lang.StringBuilder
 import java.util.*
 import kotlin.collections.ArrayList
 import kotlin.math.min
@@ -24,7 +25,9 @@ data class ParserOutput<T>(val result:T, val end:Int)
 data class Comment(val text:String, val beginIdx:Int, val endIdx:Int)
 data class NonComment(val text:String, val beginIdx:Int, val endIdx:Int)
 interface Expression
-data class SequenceOfSymbols(val seqType:Char, val symbols:List<String>, val proof:List<String>?, val beginIdx:Int): Expression
+data class CompressedProof(val labels:List<String>, val proof:String)
+data class SequenceOfSymbols(
+    val seqType:Char, val symbols:List<String>, val uncompressedProof:List<String>?, val compressedProof:CompressedProof?, val beginIdx:Int): Expression
 data class LabeledSequenceOfSymbols(val label:String, val sequence:SequenceOfSymbols, val beginIdx:Int): Expression
 
 object Parsers {
@@ -134,19 +137,26 @@ object Parsers {
             throw MetamathParserException("A whitespace was expected between the beginning of a sequence at its first element at ${inp.currPositionStr()}")
         }
         val listOfSymbols = parseListOfSymbols(inp.proceed(2))
-        val proof = if (inp.charAt(listOfSymbols.end) == '=') {
-            parseSequenceOfSymbols(inp.proceedTo(listOfSymbols.end-1))
-        } else {
-            null
+        var uncompressedProof:ParserOutput<SequenceOfSymbols>? = null
+        var compressedProof:ParserOutput<CompressedProof>? = null
+        if (inp.charAt(listOfSymbols.end) == '=') {
+            val whitespace = parseWhitespace(inp.proceedTo(listOfSymbols.end + 1))
+            val beginOfProof = listOfSymbols.end + whitespace.result.length + 1
+            if (inp.charAt(beginOfProof) == '(') {
+                compressedProof = parseCompressedProof(inp.proceedTo(beginOfProof))
+            } else {
+                uncompressedProof = parseSequenceOfSymbols(inp.proceedTo(listOfSymbols.end-1))
+            }
         }
         return ParserOutput(
             result = SequenceOfSymbols(
                 beginIdx = inp.begin,
                 seqType = seqType,
                 symbols = listOfSymbols.result,
-                proof = proof?.result?.symbols
+                uncompressedProof = uncompressedProof?.result?.symbols,
+                compressedProof = compressedProof?.result
             ),
-            end = proof?.end?:listOfSymbols.end
+            end = uncompressedProof?.end?:compressedProof?.end?:listOfSymbols.end
         )
     }
 
@@ -173,6 +183,33 @@ object Parsers {
         )
     }
 
+    fun parseCompressedProof(inp:ParserInput): ParserOutput<CompressedProof> {
+        if (inp.charAt(inp.begin) != '(') {
+            throw MetamathParserException("Compressed proof must begin with '('")
+        }
+        val labels = parseListOfSymbolsUntil(inp.proceed(1), ')')
+        var i = labels.end+2
+        var currChar = inp.charAt(i)
+        val proof = StringBuilder()
+        while (currChar != '$') {
+            if (!currChar.isWhitespace()) {
+                proof.append(currChar)
+            }
+            i++
+            currChar = inp.charAt(i)
+        }
+        if (inp.charAt(i+1) != '.') {
+            throw MetamathParserException("A proof must end with '$.' at ${inp.currPositionStr(i)}")
+        }
+        return ParserOutput(
+            result = CompressedProof(
+                labels = labels.result,
+                proof = proof.toString()
+            ),
+            end = i+1
+        )
+    }
+
     private fun parsePrintable(inp:ParserInput): ParserOutput<String> {
         return collectWhile(inp) { str, i -> !str[i].isWhitespace()}
     }
@@ -192,11 +229,23 @@ object Parsers {
     }
 
     private fun parseListOfSymbols(inp:ParserInput): ParserOutput<List<String>> {
+        val symbols = parseListOfSymbolsUntil(inp, '$')
+
+        if (inp.charAt(symbols.end+2) != '.' && inp.charAt(symbols.end+2) != '=') {
+            throw MetamathParserException("A list of symbols must end with '$.' or '$=' at ${inp.currPositionStrRel(symbols.end)}")
+        }
+        if (symbols.result.isEmpty()) {
+            throw MetamathParserException("A list of symbols is expected to have at least one element at ${inp.currPositionStr()}")
+        }
+        return ParserOutput(result = Collections.unmodifiableList(symbols.result), end = symbols.end+2)
+    }
+
+    private fun parseListOfSymbolsUntil(inp:ParserInput, endChar:Char): ParserOutput<List<String>> {
         val symbols = ArrayList<String>()
         val currSymbol = StringBuffer()
         var i = 0
         var currChar = inp.charAtRel(i)
-        while (currChar != '$') {
+        while (currChar != endChar) {
             if (currChar.isWhitespace()) {
                 if (currSymbol.isNotEmpty()) {
                     symbols.add(currSymbol.toString())
@@ -208,12 +257,6 @@ object Parsers {
             i += 1
             currChar = inp.charAtRel(i)
         }
-        if (inp.charAtRel(i+1) != '.' && inp.charAtRel(i+1) != '=') {
-            throw MetamathParserException("A list of symbols must end with '$.' or '$=' at ${inp.currPositionStrRel(i)}")
-        }
-        if (symbols.isEmpty()) {
-            throw MetamathParserException("A list of symbols is expected to have at least one element at ${inp.currPositionStr()}")
-        }
-        return ParserOutput(result = Collections.unmodifiableList(symbols), end = inp.toAbsolute(i+1))
+        return ParserOutput(result = Collections.unmodifiableList(symbols), end = inp.toAbsolute(i-1))
     }
 }

@@ -52,7 +52,7 @@ object ExpressionProcessor: ((MetamathContext,Expression) -> MetamathContext) {
 
     private fun verify(theorem: SequenceOfSymbols, ctx: MetamathContext): StackNode {
         val proofStack = ProofStack()
-        for (label in theorem.proof!!) {
+        for (label in theorem.uncompressedProof!!) {
             val hypothesis = ctx.hypotheses[label]
             if (hypothesis != null) {
                 proofStack.apply(hypothesis.sequence)

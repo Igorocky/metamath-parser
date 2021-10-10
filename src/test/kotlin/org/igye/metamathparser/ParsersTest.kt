@@ -6,7 +6,7 @@ import org.junit.Test
 
 internal class ParsersTest {
     @Test
-    fun parseSequenceOfSymbols_parses_sequence_of_symbols_with_proof() {
+    fun parseSequenceOfSymbols_parses_sequence_of_symbols_with_uncompressed_proof() {
         //when
         val parserOutput: ParserOutput<SequenceOfSymbols> =
             Parsers.parseSequenceOfSymbols(ParserInput(
@@ -23,7 +23,33 @@ internal class ParsersTest {
 
         assertEquals('p', sequenceOfSymbols.seqType)
         assertEquals(listOf("|-", "t", "=", "t"), sequenceOfSymbols.symbols)
-        assertEquals(listOf("tt", "tze", "tpl", "tt", "weq",), sequenceOfSymbols.proof)
+        assertEquals(listOf("tt", "tze", "tpl", "tt", "weq",), sequenceOfSymbols.uncompressedProof)
+    }
+
+    @Test
+    fun parseSequenceOfSymbols_parses_sequence_of_symbols_with_compressed_proof() {
+        //when
+        val parserOutput: ParserOutput<SequenceOfSymbols> =
+            Parsers.parseSequenceOfSymbols(ParserInput(
+                text = "\$p |-\n" +
+                        "                ( ( ph <-> ps ) <-> -. ( ( ph -> ps ) -> -. ( ps -> ph ) ) ) \$=\n" +
+                        "    ( wch wth wb wi wn df-bi ax-1 ax-mp ax-3 ax-2 ) ABEZABFBAFGFGZFNMFGFGZMNEZA\n" +
+                        "    BHCDCFFZOPFZCDIRGZQGZFZQRFSPOFZSFZFZUASUBISUCTFZFZUDUAFUEUFTGZUCGZFZUEUHUIM\n" +
+                        "    NHUHUGIJTUCKJUESIJSUCTLJJRQKJJJ \$.",
+                begin = 0
+            ))
+
+        //then
+        val sequenceOfSymbols = parserOutput.result
+        assertNotNull(sequenceOfSymbols.compressedProof)
+        assertEquals(
+            listOf("wch", "wth", "wb", "wi", "wn", "df-bi", "ax-1", "ax-mp", "ax-3", "ax-2"),
+            sequenceOfSymbols.compressedProof!!.labels
+        )
+        assertEquals(
+            "ABEZABFBAFGFGZFNMFGFGZMNEZABHCDCFFZOPFZCDIRGZQGZFZQRFSPOFZSFZFZUASUBISUCTFZFZUDUAFUEUFTGZUCGZFZUEUHUIMNHUHUGIJTUCKJUESIJSUCTLJJRQKJJJ",
+            sequenceOfSymbols.compressedProof!!.proof
+        )
     }
 
     @Test
@@ -41,7 +67,7 @@ internal class ParsersTest {
         assertEquals("maj", labeledSequence.label)
         assertEquals('e', labeledSequence.sequence.seqType)
         assertEquals(listOf("|-", "(", "P", "->", "Q", ")"), labeledSequence.sequence.symbols)
-        assertNull(labeledSequence.sequence.proof)
+        assertNull(labeledSequence.sequence.uncompressedProof)
     }
 
     @Test
@@ -87,8 +113,6 @@ internal class ParsersTest {
             " Define the modus ponens inference rule ",
             " Prove a theorem ",
             " Here is its proof: ",
-            " A theorem with invalid proof (two proof steps were swapped in comparison to the previous theorem) ",
-            " Here is its proof: ",
         )
         assertEquals(expectedComments.size, comments.size)
         val actualComments = comments.map { it.text.filter { ch -> ch != '\r' } }
@@ -131,7 +155,6 @@ internal class ParsersTest {
             "<<maj:e>> |- ( P -> Q )",
             "<<mp:a>> |- Q",
             "<<th1:p>> |- t = t",
-            "<<th2:p>> |- t = t",
         ).map { it.split(' ') }
         assertEquals(expectedExpressions, expressins)
     }
