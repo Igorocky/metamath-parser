@@ -29,10 +29,7 @@ data class LabeledSequenceOfSymbols(val label:String, val sequence:SequenceOfSym
 
 object Parsers {
 
-    fun traverseMetamathFile(
-        text:String,
-        exprProc: (MetamathContext,Expression) -> MetamathContext
-    ):Map<String,Assertion> {
+    fun traverseMetamathFile(text:String, exprProc: (MetamathContext,Expression) -> MetamathContext):Map<String,Assertion> {
         val (_, code: List<NonComment>) = extractComments(text)
         return traverseBlock(
             inp = ParserInput(text = code.asSequence().map { it.text }.joinToString(separator = " "), begin = 0),
@@ -64,7 +61,7 @@ object Parsers {
                             context = ctx,
                             exprProc = exprProc
                         )
-                        ctx = ctx.copy(assertions = ctx.assertions.plus(assertionsFromBlock.result))
+                        ctx = ctx.addAssertions(assertionsFromBlock.result)
                         idx = assertionsFromBlock.end+1
                     } else if (text[idx+1] == '}') {
                         return ParserOutput(result = ctx.assertions, end = idx+1)
