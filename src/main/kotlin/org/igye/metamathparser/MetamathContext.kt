@@ -1,44 +1,79 @@
 package org.igye.metamathparser
 
-data class MetamathContext(
-    val parent:MetamathContext? = null,
-    val constants:Set<String> = emptySet(),
-    val variables:Set<String> = emptySet(),
-    val hypotheses:Map<String,LabeledSequenceOfSymbols> = emptyMap(),
-    val assertions:Map<String,Assertion> = emptyMap(),
+class MetamathContext(
+    private val parent:MetamathContext? = null
 ) {
-    fun addConstants(constants:Collection<String>):MetamathContext {
-        return copy(
-            parent = this,
-            constants = this.constants.plus(constants)
-        )
+    private val constants:MutableSet<String>? = if (parent == null) HashSet() else null
+    private var variables:MutableSet<String>? = null
+    private var hypotheses:MutableMap<String,LabeledSequenceOfSymbols>? = null
+    private val assertions:MutableMap<String,Assertion>? = if (parent == null) HashMap() else null
+
+    fun createChildContext(): MetamathContext {
+        return MetamathContext(parent = this)
     }
 
-    fun addVariables(variables:Collection<String>):MetamathContext {
-        return copy(
-            parent = this,
-            variables = this.variables.plus(variables)
-        )
+    private var assertionsCache:MutableMap<String,Assertion>? = null
+    fun getAssertions(): MutableMap<String, Assertion> {
+        if (assertionsCache == null) {
+            assertionsCache = if (parent == null) {
+                assertions!!
+            } else {
+                parent.getAssertions()
+            }
+        }
+        return assertionsCache!!
     }
 
-    fun addHypothesis(name:String, expr:LabeledSequenceOfSymbols):MetamathContext {
-        return copy(
-            parent = this,
-            hypotheses = this.hypotheses.plus(name to expr)
-        )
+    fun getHypothesis(name:String):LabeledSequenceOfSymbols? {
+        return hypotheses?.get(name)?:parent?.getHypothesis(name)
     }
 
-    fun addAssertion(name:String, assertion: Assertion):MetamathContext {
-        return copy(
-            parent = this,
-            assertions = this.assertions.plus(name to assertion)
-        )
+    fun getHypotheses(filter:(LabeledSequenceOfSymbols) -> Boolean):List<LabeledSequenceOfSymbols> {
+        val result = ArrayList<LabeledSequenceOfSymbols>()
+        var ctx: MetamathContext? = this
+        while (ctx != null) {
+            if (ctx.hypotheses != null) {
+                for (hypothesis in ctx.hypotheses!!.values) {
+                    if (filter(hypothesis)) {
+                        result.add(hypothesis)
+                    }
+                }
+            }
+            ctx = ctx.parent
+        }
+        return result
     }
 
-    fun addAssertions(assertions:Map<String,Assertion>):MetamathContext {
-        return copy(
-            parent = this,
-            assertions = this.assertions.plus(assertions)
-        )
+    fun variableExists(name:String): Boolean {
+        return variables?.contains(name)?:false || parent?.variableExists(name)?:false
+    }
+
+    fun addConstants(constants:Set<String>) {
+        if (parent != null) {
+            throw MetamathParserException("Constant declaration is allowed only in the outermost block.")
+        }
+        this.constants!!.addAll(constants)
+    }
+
+    fun addVariables(variables:Set<String>) {
+        if (this.variables == null) {
+            this.variables = HashSet()
+        }
+        this.variables!!.addAll(variables)
+    }
+
+    fun addHypothesis(name:String, expr:LabeledSequenceOfSymbols) {
+        if (this.hypotheses == null) {
+            this.hypotheses = HashMap()
+        }
+        this.hypotheses!![name] = expr
+    }
+
+    fun addAssertion(name:String,expr:Assertion) {
+        getAssertions()[name] = expr
+    }
+
+    fun addAssertions(assertions:Map<String,Assertion>) {
+        getAssertions().putAll(assertions)
     }
 }

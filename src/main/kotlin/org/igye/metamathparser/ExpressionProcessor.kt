@@ -1,11 +1,12 @@
 package org.igye.metamathparser
 
-object ExpressionProcessor: ((MetamathContext,Expression) -> MetamathContext) {
-    override fun invoke(ctx: MetamathContext, expr: Expression): MetamathContext {
-        return when (expr) {
+object ExpressionProcessor: ((MetamathContext,Expression) -> Unit) {
+    override fun invoke(ctx: MetamathContext, expr: Expression) {
+        when (expr) {
             is SequenceOfSymbols -> when (expr.seqType) {
-                'c' -> ctx.addConstants(expr.symbols)
-                'v' -> ctx.addVariables(expr.symbols)
+                'c' -> ctx.addConstants(expr.symbols.toSet())
+                'v' -> ctx.addVariables(expr.symbols.toSet())
+                'd' -> ctx
                 else -> throw MetamathParserException()
             }
             is LabeledSequenceOfSymbols -> when (expr.sequence.seqType) {
@@ -19,33 +20,30 @@ object ExpressionProcessor: ((MetamathContext,Expression) -> MetamathContext) {
         }
     }
 
-    private fun processTheorem(ctx: MetamathContext, expr: LabeledSequenceOfSymbols): MetamathContext {
+    private fun processTheorem(ctx: MetamathContext, expr: LabeledSequenceOfSymbols) {
         val theorem = createAssertion(ctx, expr)
         verify(theorem, ctx)
-        return ctx.addAssertion(expr.label, theorem)
+        ctx.addAssertion(expr.label, theorem)
     }
 
     private fun createAssertion(ctx: MetamathContext, expr: LabeledSequenceOfSymbols): Assertion {
-        val variables = getAllVariablesUsed(ctx, expr.sequence);
-        val hypotheses = ctx.hypotheses.values.asSequence()
-            .filter {
-                when (it.sequence.seqType) {
-                    'f' -> variables.contains(it.sequence.symbols[1])
-                    'e' -> true
-                    else -> throw MetamathParserException("Unexpected type of a hypothesis: ${it.sequence.seqType}")
-                }
+        val variables = getAllVariablesUsed(ctx, expr.sequence)
+        val hypotheses = ctx.getHypotheses {
+            when (it.sequence.seqType) {
+                'f' -> variables.contains(it.sequence.symbols[1])
+                'e' -> true
+                else -> throw MetamathParserException("Unexpected type of a hypothesis: ${it.sequence.seqType}")
             }
-            .sortedBy { it.beginIdx }
-            .toList()
+        }.sortedBy { it.beginIdx }
         return Assertion(hypotheses = hypotheses, assertion = expr)
     }
 
     private fun getAllVariablesUsed(ctx: MetamathContext, expr: SequenceOfSymbols):Set<String> {
         val result = HashSet<String>()
-        expr.symbols.asSequence().filter { ctx.variables.contains(it) }.forEach { result.add(it) }
-        ctx.hypotheses.values.asSequence().filter { it.sequence.seqType == 'e' }.forEach { essential ->
+        expr.symbols.asSequence().filter { ctx.variableExists(it) }.forEach { result.add(it) }
+        ctx.getHypotheses { it.sequence.seqType == 'e' }.forEach { essential ->
             essential.sequence.symbols.asSequence()
-                .filter { ctx.variables.contains(it) }
+                .filter { ctx.variableExists(it) }
                 .forEach { result.add(it) }
         }
         return result
@@ -86,7 +84,7 @@ object ExpressionProcessor: ((MetamathContext,Expression) -> MetamathContext) {
         ctx: MetamathContext
     ) {
         val args = ArrayList<Any>(mandatoryHypotheses)
-        compressedProof.labels.forEach { args.add(ctx.hypotheses[it]?.sequence?:ctx.assertions[it]!!) }
+        compressedProof.labels.forEach { args.add(ctx.getHypothesis(it)?.sequence?:ctx.getAssertions()[it]!!) }
         val proof: List<String> = splitEncodedProof(compressedProof.proof)
 
         for (step in proof) {
@@ -106,11 +104,11 @@ object ExpressionProcessor: ((MetamathContext,Expression) -> MetamathContext) {
     }
 
     private fun apply(label:String, proofStack:ProofStack, ctx: MetamathContext) {
-        val hypothesis: LabeledSequenceOfSymbols? = ctx.hypotheses[label]
+        val hypothesis: LabeledSequenceOfSymbols? = ctx.getHypothesis(label)
         if (hypothesis != null) {
             proofStack.apply(hypothesis.sequence)
         } else {
-            proofStack.apply(ctx.assertions[label]!!)
+            proofStack.apply(ctx.getAssertions()[label]!!)
         }
     }
 

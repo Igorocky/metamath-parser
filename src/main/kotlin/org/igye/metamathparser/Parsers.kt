@@ -1,8 +1,6 @@
 package org.igye.metamathparser
 
-import java.lang.StringBuilder
 import java.util.*
-import kotlin.collections.ArrayList
 import kotlin.math.min
 
 data class ParserInput(val text:String, val begin:Int) {
@@ -32,50 +30,52 @@ data class LabeledSequenceOfSymbols(val label:String, val sequence:SequenceOfSym
 
 object Parsers {
 
-    fun traverseMetamathFile(text:String, exprProc: (MetamathContext,Expression) -> MetamathContext):Map<String,Assertion> {
+    fun traverseMetamathFile(text:String, exprProc: (MetamathContext,Expression) -> Unit):MetamathContext {
         val (_, code: List<NonComment>) = extractComments(text)
-        return traverseBlock(
+        val ctx = MetamathContext()
+        traverseBlock(
             inp = ParserInput(text = code.asSequence().map { it.text }.joinToString(separator = " "), begin = 0),
+            context = ctx,
             exprProc = exprProc
-        ).result
+        )
+        return ctx
     }
 
     private fun traverseBlock(
         inp:ParserInput,
-        context:MetamathContext = MetamathContext(),
-        exprProc: (MetamathContext,Expression) -> MetamathContext
-    ):ParserOutput<Map<String,Assertion>> {
+        context:MetamathContext,
+        exprProc: (MetamathContext,Expression) -> Unit
+    ):ParserOutput<Unit> {
         var idx = inp.begin
         val text = inp.text
-        var ctx = context
         while (true) {
             while (idx < text.length && text[idx].isWhitespace()) {
                 idx++
             }
             if (!(idx < text.length)) {
-                return ParserOutput(result = ctx.assertions, end = idx-1)
+                return ParserOutput(result = Unit, end = idx-1)
             }
 
             if (idx+1 < text.length) {
                 if (text[idx] == '$') {
                     if (text[idx+1] == '{') {
+                        val childContext = context.createChildContext()
                         val assertionsFromBlock = traverseBlock(
                             inp = inp.proceedTo(idx + 2),
-                            context = ctx,
+                            context = childContext,
                             exprProc = exprProc
                         )
-                        ctx = ctx.addAssertions(assertionsFromBlock.result)
                         idx = assertionsFromBlock.end+1
                     } else if (text[idx+1] == '}') {
-                        return ParserOutput(result = ctx.assertions, end = idx+1)
+                        return ParserOutput(result = Unit, end = idx+1)
                     } else {
                         val sequenceOfSymbols = parseSequenceOfSymbols(inp.proceedTo(idx))
-                        ctx = exprProc(ctx, sequenceOfSymbols.result)
+                        exprProc(context, sequenceOfSymbols.result)
                         idx = sequenceOfSymbols.end+1
                     }
                 } else {
                     val sequenceOfSymbols = parseLabeledSequenceOfSymbols(inp.proceedTo(idx))
-                    ctx = exprProc(ctx, sequenceOfSymbols.result)
+                    exprProc(context, sequenceOfSymbols.result)
                     idx = sequenceOfSymbols.end+1
                 }
             } else {

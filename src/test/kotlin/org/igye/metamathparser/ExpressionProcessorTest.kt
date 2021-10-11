@@ -2,7 +2,8 @@ package org.igye.metamathparser
 
 import org.igye.metamathparser.ExpressionProcessor.splitEncodedProof
 import org.igye.metamathparser.ExpressionProcessor.strToInt
-import org.junit.Assert.*
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.util.*
 
@@ -11,7 +12,7 @@ internal class ExpressionProcessorTest {
     fun successfully_processes_metamath_file_with_noncompressed_valid_proofs() {
         //when
         val assertions: Map<String, Assertion> =
-            Parsers.traverseMetamathFile(text = Utils.readStringFromClassPath("/demo0.mm"), ExpressionProcessor)
+            Parsers.traverseMetamathFile(text = Utils.readStringFromClassPath("/demo0.mm"), ExpressionProcessor).getAssertions()
 
         //then
         assertEquals(setOf("tze","tpl","weq","wim","a1","a2","mp","th1"), assertions.keys)
@@ -20,15 +21,14 @@ internal class ExpressionProcessorTest {
     @Test(expected = MetamathParserException::class)
     fun fails_to_processes_metamath_file_with_noncompressed_invalid_proofs() {
         //when
-        val assertions: Map<String, Assertion> =
-            Parsers.traverseMetamathFile(text = Utils.readStringFromClassPath("/demo0-with-incorrect-proof.mm"), ExpressionProcessor)
+        Parsers.traverseMetamathFile(text = Utils.readStringFromClassPath("/demo0-with-incorrect-proof.mm"), ExpressionProcessor)
     }
 
     @Test
     fun successfully_processes_metamath_file_with_compressed_valid_proofs() {
         //when
         val assertions: Map<String, Assertion> =
-            Parsers.traverseMetamathFile(text = Utils.readStringFromClassPath("/set-reduced.mm"), ExpressionProcessor)
+            Parsers.traverseMetamathFile(text = Utils.readStringFromClassPath("/set-reduced.mm"), ExpressionProcessor).getAssertions()
 
         //then
         assertEquals(193, assertions.size)
