@@ -1,5 +1,6 @@
 package org.igye.metamathparser
 
+import org.igye.common.Utils
 import org.igye.metamathparser.ExpressionProcessor.splitEncodedProof
 import org.igye.metamathparser.ExpressionProcessor.strToInt
 import org.junit.Assert.assertEquals
@@ -19,7 +20,7 @@ internal class ExpressionProcessorTest {
     }
 
     @Test(expected = MetamathParserException::class)
-    fun fails_to_processes_metamath_file_with_noncompressed_invalid_proofs() {
+    fun fails_to_process_metamath_file_with_noncompressed_invalid_proofs() {
         //when
         Parsers.traverseMetamathFile(text = Utils.readStringFromClassPath("/demo0-with-incorrect-proof.mm"), ExpressionProcessor)
     }
