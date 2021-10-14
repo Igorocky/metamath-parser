@@ -2,7 +2,7 @@ package org.igye.metamathvisualizer.dto
 
 data class StackNodeDto(
     val id: Int,
-    val args: List<Int>,
+    var args: List<Int>,
     val type: String,
     val label: String,
     val params: List<List<String>>,

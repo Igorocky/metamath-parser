@@ -5,7 +5,7 @@ class CalculatedStackNode(
     val substitution: Map<String,List<String>>,
     val assertion: Assertion,
     value: List<String>
-):StackNode(value) {
+):StackNode(value = value) {
     override fun toString(): String {
         return "Calculated: ${value.joinToString(separator = " ")}"
     }

@@ -1,34 +1,32 @@
 package org.igye.metamathvisualizer
 
+import com.google.gson.Gson
 import org.igye.common.DebugTimer
-import org.igye.common.Utils
 import org.igye.common.Utils.inputStreamFromClassPath
 import org.igye.common.Utils.readStringFromClassPath
 import org.igye.metamathparser.Assertion
+import org.igye.metamathparser.CalculatedStackNode
 import org.igye.metamathparser.MetamathParserException
 import org.igye.metamathparser.StackNode
-import org.igye.metamathvisualizer.dto.AssertionDto
-import org.igye.metamathvisualizer.dto.IndexDto
-import org.igye.metamathvisualizer.dto.IndexElemDto
-import org.igye.metamathvisualizer.dto.StackNodeDto
+import org.igye.metamathvisualizer.CompressionUtils.compress
+import org.igye.metamathvisualizer.dto.*
 import java.io.File
 import java.io.FileOutputStream
 import java.math.BigDecimal
 import java.math.RoundingMode
-import java.nio.charset.StandardCharsets
 import java.util.*
-import java.util.concurrent.*
+import java.util.concurrent.ConcurrentLinkedQueue
+import java.util.concurrent.ConcurrentSkipListMap
+import java.util.concurrent.Executors
+import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicReference
-import java.util.function.Consumer
 import java.util.function.Function
-import java.util.function.Predicate
 import java.util.stream.Collectors
-import java.util.stream.Stream
 
 object MetamathVisualizer {
-    private const val DOT_REPLACEMENT = "-dot-"
     private val filePathSeparatorRegex = "/|\\\\".toRegex()
+    private val gson = Gson()
 
     fun generateProofExplorer(
         assertions: List<Assertion>, version: String, numOfThreads: Int, pathToDirToSaveTo: String
@@ -69,8 +67,7 @@ object MetamathVisualizer {
                 var assertion = queue.poll()
                 while (assertion != null && errorOccurred.get() == null) {
                     try {
-                        val dto: AssertionDto =
-                            DebugTimer.run("visualizeAssertion") { visualizeAssertion(assertion) }
+                        val dto: AssertionDto = DebugTimer.run("visualizeAssertion") { visualizeAssertion(assertion) }
                         DebugTimer.run("createAssertionHtmlFile") {
                             createAssertionHtmlFile(
                                 version, dto, dirToSaveTo, createRelPathToSaveTo(dto.name)
@@ -103,7 +100,7 @@ object MetamathVisualizer {
             version,
             ".",
             "MetamathIndexView",
-            CompressionUtils.compress(buildIndex(indexElems.values)),
+            compress(buildIndex(indexElems.values)),
             File(dirToSaveTo, "index.html")
         )
     }
@@ -131,152 +128,93 @@ object MetamathVisualizer {
     }
 
     fun visualizeAssertion(assertion: Assertion): AssertionDto {
-        val assertionDto: AssertionDto.AssertionDtoBuilder = AssertionDto.builder()
-        assertionDto.type(getTypeStr(assertion.getType()))
-        assertionDto.name(assertion.getLabel())
-        assertionDto.description(assertion.getDescription())
-        assertionDto.params(
-            assertion.getFrame().getHypotheses().stream()
-                .map(ListStatement::getSymbols)
-                .collect(Collectors.toList())
-        )
-        assertionDto.retVal(
-            assertion.getFrame().getAssertion().getSymbols()
-        )
-        val varTypes = HashMap<String, String>()
-        assertionDto.varTypes(varTypes)
-        varTypes.putAll(DebugTimer.call("extractVarTypes-1") {
-            extractVarTypes(
-                assertion.getFrame().getContext(),
-                Stream.concat(
-                    assertion.getFrame().getHypotheses().stream().flatMap { h -> h.getSymbols().stream() },
-                    assertion.getFrame().getAssertion().getSymbols().stream()
-                ).collect<Set<String>, Any>(Collectors.toSet<Any>())
-            )
-        })
-        if (assertion.getType() === ListStatementType.THEOREM) {
+        val proof = if (assertion.assertion.sequence.seqType == 'p') {
             val nodes: MutableList<StackNodeDto> = ArrayList<StackNodeDto>()
-            val proof: StackNode = DebugTimer.call("verifyProof") { verifyProof(assertion) }
             DebugTimer.run("iterateNodes") {
-                iterateNodes(proof,
-                    Consumer<StackNode> { node: StackNode ->
-                        if (node is RuleStackNode) {
-                            val ruleNode: RuleStackNode = node as RuleStackNode
-                            val frame: Frame = ruleNode.getAssertion().getFrame()
-                            nodes.add(
-                                StackNodeDto.builder()
-                                    .id(node.getId())
-                                    .args(
-                                        ruleNode.getArgs().stream().map(StackNode::getId).collect(Collectors.toList())
-                                    )
-                                    .type(ruleNode.getAssertion().getType().getShortName().toUpperCase())
-                                    .label(ruleNode.getAssertion().getLabel())
-                                    .params(
-                                        Stream.concat(
-                                            frame.getTypes().stream(),
-                                            frame.getHypotheses().stream()
-                                        )
-                                            .map<Any>(Function<T, Any> { stm: T -> stm.getSymbols() })
-                                            .collect(Collectors.toList())
-                                    )
-                                    .numOfTypes(frame.getTypes().size())
-                                    .retVal(ruleNode.getAssertion().getSymbols())
-                                    .substitution(ruleNode.getSubstitution())
-                                    .expr(ruleNode.getExpr())
-                                    .build()
-                            )
-                        } else {
-                            val constNode: ConstStackNode = node as ConstStackNode
-                            nodes.add(
-                                StackNodeDto.builder()
-                                    .id(node.getId())
-                                    .type(constNode.getStatement().getType().getShortName().toUpperCase())
-                                    .label(constNode.getStatement().getLabel())
-                                    .expr(constNode.getExpr())
-                                    .build()
-                            )
-                        }
-                    })
+                iterateNodes(assertion.proof!!) { node: StackNode ->
+                    if (node is CalculatedStackNode) {
+                        nodes.add(StackNodeDto(
+                            id = node.getId(),
+                            args = node.args.map { it.getId() },
+                            type = node.assertion.assertion.sequence.seqType.uppercase(),
+                            label = node.assertion.assertion.label,
+                            params = node.assertion.hypotheses.map { it.sequence.symbols },
+                            numOfTypes = node.assertion.hypotheses.asSequence().filter { it.sequence.seqType == 'f' }.count(),
+                            retVal = node.assertion.assertion.sequence.symbols,
+                            substitution = node.substitution,
+                            expr = node.value
+                        ))
+                    } else {
+                        nodes.add(StackNodeDto(
+                            id = node.getId(),
+                            args = emptyList(),
+                            type = node.stmt!!.sequence.seqType.uppercase(),
+                            label = node.stmt!!.label,
+                            params = emptyList(),
+                            numOfTypes = 0,
+                            retVal = emptyList(),
+                            substitution = emptyMap(),
+                            expr = node.stmt.sequence.symbols
+                        ))
+                    }
+                }
             }
-            Collections.sort(nodes, Comparator.comparing<Any, Any>(StackNodeDto::getId))
-            val uniqueSteps: List<StackNodeDto> = DebugTimer.call("remove-duplicate-steps") {
-                removeDuplicates(
-                    nodes
-                )
+            Collections.sort(nodes, Comparator.comparing { it.id })
+            val uniqueSteps: List<StackNodeDto> = DebugTimer.run("remove-duplicate-steps") {
+                removeDuplicates(nodes)
             }
-            assertionDto.proof(uniqueSteps)
-            varTypes.putAll(DebugTimer.call("extractVarTypes-2") {
-                extractVarTypes(
-                    assertion.getFrame().getContext(),
-                    nodes.stream()
-                        .flatMap(Function<StackNodeDto, Stream<*>> { node: StackNodeDto ->
-                            Stream.concat(
-                                Stream.concat(
-                                    if (node.getParams() == null) Stream.empty() else node.getParams()
-                                        .stream()
-                                        .flatMap { obj: List<*> -> obj.stream() },
-                                    if (node.getRetVal() == null) Stream.empty() else node.getRetVal()
-                                        .stream()
-                                ),
-                                node.getExpr().stream()
-                            )
-                        }).collect(Collectors.toSet<Any>())
-                )
-            })
+            uniqueSteps
+        } else {
+            emptyList()
         }
-        return assertionDto.build()
+        return AssertionDto(
+            type = getTypeStr(assertion),
+            name = assertion.assertion.label,
+            description = "???",
+            varTypes = extractVarTypes(assertion),
+            params = assertion.hypotheses.map { it.sequence.symbols },
+            retVal = assertion.assertion.sequence.symbols,
+            proof = proof
+        )
     }
 
-
     private fun removeDuplicates(nodes: List<StackNodeDto>): List<StackNodeDto> {
-        val nodesToProcess: List<StackNodeDto> = ArrayList<Any?>(nodes)
-        val result: MutableList<StackNodeDto?> = ArrayList<StackNodeDto?>()
-        val exprToNode: MutableMap<String, StackNodeDto> = HashMap<String, StackNodeDto>()
+        val nodesToProcess: MutableList<StackNodeDto> = ArrayList(nodes)
+        val result: MutableList<StackNodeDto> = ArrayList()
+        val exprToNode: MutableMap<String, StackNodeDto> = HashMap()
         val nodeIdRemap: MutableMap<Int, Int> = HashMap()
         while (!nodesToProcess.isEmpty()) {
             val node: StackNodeDto = nodesToProcess.removeAt(0)
-            if (nodeIdRemap.containsKey(node.getId())) {
-                throw MetamathException("nodeIdRemap.containsKey(node.getId())")
+            if (nodeIdRemap.containsKey(node.id)) {
+                throw MetamathParserException("nodeIdRemap.containsKey(node.id)")
             }
-            val exprStr: String = StringUtils.join(node.getExpr(), " ")
+            val exprStr: String = node.expr.joinToString(separator = " ")
             val existingNode: StackNodeDto? = exprToNode[exprStr]
             if (existingNode == null) {
                 exprToNode[exprStr] = node
-                nodeIdRemap[node.getId()] = node.getId()
-                result.add(node)
-                if (node.getArgs() != null) {
-                    node.setArgs(node.getArgs().stream().map { key: Any? -> nodeIdRemap[key] }
-                        .collect(Collectors.toList()))
-                    if (node.getArgs().stream().anyMatch { obj: Any? -> Objects.isNull(obj) }) {
-                        throw MetamathException("node.getArgs().stream().anyMatch(Objects::isNull)")
-                    }
+                nodeIdRemap[node.id] = node.id
+                if (node.args.isNotEmpty()) {
+                    node.args = node.args.map { nodeIdRemap[it]!! }
                 }
+                result.add(node)
             } else {
-                nodeIdRemap[node.getId()] = existingNode.getId()
+                nodeIdRemap[node.id] = existingNode.id
             }
         }
         return result
     }
 
-
-
-
-
-
-
-
-
-    private fun iterateNodes(root: StackNode, nodeConsumer: Consumer<StackNode>) {
+    private fun iterateNodes(root: StackNode, nodeConsumer: (StackNode) -> Unit) {
         val processed: MutableSet<StackNode> = HashSet<StackNode>()
         val toProcess: Stack<StackNode> = Stack<StackNode>()
         toProcess.push(root)
         while (!toProcess.isEmpty()) {
             val curNode: StackNode = toProcess.pop()
             if (!processed.contains(curNode)) {
-                nodeConsumer.accept(curNode)
+                nodeConsumer.invoke(curNode)
                 processed.add(curNode)
-                if (curNode is RuleStackNode) {
-                    toProcess.addAll((curNode as RuleStackNode).getArgs())
+                if (curNode is CalculatedStackNode) {
+                    toProcess.addAll(curNode.args)
                 }
             }
         }
@@ -329,10 +267,12 @@ object MetamathVisualizer {
     private fun createHtmlFile(
         version: String?, relPathToRoot: String, viewComponentName: String, viewProps: Any, file: File
     ) {
-        val viewPropsStr: String = Utils.toJson(Utils.toJson(viewProps))
-        val decompressionFunctionName =
-            (if (viewProps is CompressedAssertionDto2) "decompressAssertionDto" else if (viewProps is CompressedIndexDto2) "decompressIndexDto" else null)
-                ?: throw MetamathException("decompressionFunctionName == null")
+        val viewPropsStr: String = gson.toJson(gson.toJson(viewProps))
+        val decompressionFunctionName = when(viewProps) {
+            is CompressedAssertionDto2 -> "decompressAssertionDto"
+            is CompressedIndexDto2 -> "decompressIndexDto"
+            else -> throw MetamathParserException("decompressionFunctionName == null")
+        }
         val finalVersion = version ?: "."
         copyFromClasspath(
             "/ui/index.html",
@@ -361,79 +301,27 @@ object MetamathVisualizer {
             relPathToRoot,
             "MetamathAssertionView",
             compress(assertionDto),
-            File(dataDir, StringUtils.join(relPath, '/'))
+            File(dataDir, relPath.joinToString(separator = "/"))
         )
     }
 
-    private fun getTypeStr(type: ListStatementType): String? {
-        return if (type === ListStatementType.AXIOM) "Axiom" else if (type === ListStatementType.THEOREM) "Theorem" else type.name()
-    }
-
-    @JvmStatic
-    fun main(args: Array<String>) {
-        if (1 == 1) throw MetamathException("")
-        if (1 != 1) {
-            val files: MutableMap<String, MutableList<String>> = HashMap()
-            val database: MetamathDatabase = MetamathParsers.load("D:\\Install\\metamath\\metamath\\set.mm")
-            val allAssertions: List<ListStatement> = database.getAllAssertions()
-            println("Len = 1: " + allAssertions.stream().filter(Predicate<ListStatement> { a: ListStatement ->
-                a.getLabel().length() === 1
-            }).count())
-            allAssertions.stream().filter(Predicate<ListStatement> { a: ListStatement ->
-                a.getLabel().length() === 1
-            }).forEach(
-                Consumer<ListStatement> { a: ListStatement -> System.out.println("- " + a.getLabel()) })
-            for (assertion in allAssertions) {
-                val relPath: String = Utils.toJson(getRelPath(assertion.getLabel()))
-                files.computeIfAbsent(
-                    relPath
-                ) { p: String? -> ArrayList() }.add(assertion.getLabel().toString() + ".html")
-            }
-            files.entries.stream()
-                .filter { (_, value): Map.Entry<String, List<String>> -> value.size > 50 }
-                .sorted(
-                    Comparator.comparing<Map.Entry<String, List<String>>, String>(
-                        Function<Map.Entry<String, List<String>>, String> { (key, value) -> java.util.Map.Entry.key })
-                )
-                .forEach { (key, value): Map.Entry<String, List<String>> ->
-                    println(
-                        key + " = " + value.size
-                    )
-                }
+    private fun getTypeStr(type: Assertion): String {
+        return when(type.assertion.sequence.seqType) {
+            'a' -> "Axiom"
+            'p' -> "Theorem"
+            else -> type.assertion.sequence.seqType.toString()
         }
     }
 
-    private fun getRelPath(label: String): List<String>? {
-        var label = label
-        label = StringUtils.trim(label)
-        if (StringUtils.isBlank(label)) {
-            throw MetamathException("StringUtils.isBlank(label)")
+    private fun createRelPathToSaveTo(label: String): List<String> {
+        return listOf("asrt", "$label.html")
+    }
+
+    private fun extractVarTypes(assertion: Assertion): Map<String, String> {
+        return DebugTimer.run("extractVarTypes") {
+            val symbols: Set<String> = assertion.hypotheses.asSequence().flatMap { it.sequence.symbols }.toSet()
+            assertion.context.getHypotheses { it.sequence.seqType == 'f' && symbols.contains(it.sequence.symbols[1])}
+                .associate { it.sequence.symbols[1] to it.sequence.symbols[0] }
         }
-        return if (label.length >= 6) {
-            Arrays.asList(label.substring(0, 2), label.substring(2, 4), label.substring(4, 6))
-        } else if (label.length >= 4) {
-            Arrays.asList(label.substring(0, 2), label.substring(2, 4))
-        } else if (label.length >= 2) {
-            Arrays.asList(label.substring(0, 2))
-        } else {
-            listOf(label)
-        }
-    }
-
-    protected fun createRelPathToSaveTo(label: String): List<String> {
-        return Arrays.asList("asrt", "$label.html")
-    }
-
-    private fun replaceDots(str: String): String? {
-        return str.replace(".", DOT_REPLACEMENT)
-    }
-
-    private fun extractVarTypes(context: MetamathContext, symbols: Set<String>): Map<String?, String?>? {
-        return context.getSymbolsInfo().getVarTypes().entrySet().stream()
-            .filter { entry -> symbols.contains(entry.getKey()) }
-            .collect(Collectors.toMap(
-                Function<T, K> { java.util.Map.Entry.key },
-                Function<T, U> { entry: T -> entry.getValue().getSymbols().get(0) }
-            ))
     }
 }

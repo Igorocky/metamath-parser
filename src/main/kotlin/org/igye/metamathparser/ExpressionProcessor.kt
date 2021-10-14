@@ -22,8 +22,7 @@ object ExpressionProcessor: ((MetamathContext,Expression) -> Unit) {
 
     private fun processTheorem(ctx: MetamathContext, expr: LabeledSequenceOfSymbols) {
         val theorem = createAssertion(ctx, expr)
-        verify(theorem, ctx)
-        ctx.addAssertion(expr.label, theorem)
+        ctx.addAssertion(expr.label, theorem.copy(proof = verify(theorem, ctx)))
     }
 
     private fun createAssertion(ctx: MetamathContext, expr: LabeledSequenceOfSymbols): Assertion {
@@ -35,7 +34,7 @@ object ExpressionProcessor: ((MetamathContext,Expression) -> Unit) {
                 else -> throw MetamathParserException("Unexpected type of a hypothesis: ${it.sequence.seqType}")
             }
         }.sortedBy { it.beginIdx }
-        return Assertion(hypotheses = hypotheses, assertion = expr)
+        return Assertion(hypotheses = hypotheses, assertion = expr, context = ctx.getRootContext())
     }
 
     private fun getAllVariablesUsed(ctx: MetamathContext, expr: SequenceOfSymbols):Set<String> {
@@ -84,7 +83,7 @@ object ExpressionProcessor: ((MetamathContext,Expression) -> Unit) {
         ctx: MetamathContext
     ) {
         val args = ArrayList<Any>(mandatoryHypotheses)
-        compressedProof.labels.forEach { args.add(ctx.getHypothesis(it)?.sequence?:ctx.getAssertions()[it]!!) }
+        compressedProof.labels.forEach { args.add(ctx.getHypothesis(it)?:ctx.getAssertions()[it]!!) }
         val proof: List<String> = splitEncodedProof(compressedProof.proof)
 
         for (step in proof) {
@@ -94,7 +93,7 @@ object ExpressionProcessor: ((MetamathContext,Expression) -> Unit) {
                 val arg = args[strToInt(step)-1]
                 if (arg is StackNode) {
                     proofStack.add(arg)
-                } else if (arg is SequenceOfSymbols) {
+                } else if (arg is LabeledSequenceOfSymbols) {
                     proofStack.apply(arg)
                 } else {
                     proofStack.apply((arg as Assertion))
@@ -106,7 +105,7 @@ object ExpressionProcessor: ((MetamathContext,Expression) -> Unit) {
     private fun apply(label:String, proofStack:ProofStack, ctx: MetamathContext) {
         val hypothesis: LabeledSequenceOfSymbols? = ctx.getHypothesis(label)
         if (hypothesis != null) {
-            proofStack.apply(hypothesis.sequence)
+            proofStack.apply(hypothesis)
         } else {
             proofStack.apply(ctx.getAssertions()[label]!!)
         }

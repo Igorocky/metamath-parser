@@ -3,6 +3,7 @@ package org.igye.metamathparser
 class MetamathContext(
     private val parent:MetamathContext? = null
 ) {
+    private var rootContext:MetamathContext? = null
     private val constants:MutableSet<String>? = if (parent == null) HashSet() else null
     private var variables:MutableSet<String>? = null
     private var hypotheses:MutableMap<String,LabeledSequenceOfSymbols>? = null
@@ -10,6 +11,13 @@ class MetamathContext(
 
     fun createChildContext(): MetamathContext {
         return MetamathContext(parent = this)
+    }
+
+    fun getRootContext(): MetamathContext {
+        if (rootContext == null) {
+            rootContext = parent?.getRootContext() ?: this
+        }
+        return rootContext!!
     }
 
     private var assertionsCache:MutableMap<String,Assertion>? = null

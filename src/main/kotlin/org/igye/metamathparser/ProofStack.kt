@@ -10,11 +10,11 @@ class ProofStack {
 
     fun get(i:Int) = stack.get(i)
 
-    fun apply(constStmt: SequenceOfSymbols) {
-        if (constStmt.seqType != 'f' && constStmt.seqType != 'e') {
+    fun apply(constStmt: LabeledSequenceOfSymbols) {
+        if (constStmt.sequence.seqType != 'f' && constStmt.sequence.seqType != 'e') {
             throw MetamathParserException("constStmt.seqType != 'f' && constStmt.seqType != 'e'")
         }
-        add(StackNode(value = constStmt.symbols))
+        add(StackNode(stmt = constStmt, value = constStmt.sequence.symbols))
     }
 
     fun apply(assertion: Assertion) {
