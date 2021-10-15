@@ -55,7 +55,7 @@ object ExpressionProcessor: ((MetamathContext,Expression) -> Unit) {
         } else {
             eval(
                 compressedProof = theorem.assertion.sequence.compressedProof!!,
-                mandatoryHypotheses = theorem.hypotheses.map { it.sequence },
+                mandatoryHypotheses = theorem.hypotheses,
                 proofStack = proofStack,
                 ctx = ctx
             )
@@ -78,7 +78,7 @@ object ExpressionProcessor: ((MetamathContext,Expression) -> Unit) {
 
     private fun eval(
         compressedProof:CompressedProof,
-        mandatoryHypotheses:List<SequenceOfSymbols>,
+        mandatoryHypotheses:List<LabeledSequenceOfSymbols>,
         proofStack:ProofStack,
         ctx: MetamathContext
     ) {
