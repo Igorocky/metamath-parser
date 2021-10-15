@@ -34,7 +34,7 @@ object ExpressionProcessor: ((MetamathContext,Expression) -> Unit) {
                 else -> throw MetamathParserException("Unexpected type of a hypothesis: ${it.sequence.seqType}")
             }
         }.sortedBy { it.beginIdx }
-        return Assertion(hypotheses = hypotheses, assertion = expr, context = ctx.getRootContext())
+        return Assertion(description = ctx.lastComment?:"", hypotheses = hypotheses, assertion = expr, context = ctx.getRootContext())
     }
 
     private fun getAllVariablesUsed(ctx: MetamathContext, expr: SequenceOfSymbols):Set<String> {

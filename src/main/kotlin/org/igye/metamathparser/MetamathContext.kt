@@ -1,7 +1,8 @@
 package org.igye.metamathparser
 
 class MetamathContext(
-    private val parent:MetamathContext? = null
+    private val parent:MetamathContext? = null,
+    var lastComment: String? = null
 ) {
     private var rootContext:MetamathContext? = null
     private val constants:MutableSet<String>? = if (parent == null) HashSet() else null

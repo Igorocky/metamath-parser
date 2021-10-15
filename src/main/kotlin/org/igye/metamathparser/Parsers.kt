@@ -1,6 +1,7 @@
 package org.igye.metamathparser
 
 import java.util.*
+import kotlin.collections.ArrayList
 import kotlin.math.min
 
 data class ParserInput(val text:String, val begin:Int) {
@@ -21,7 +22,7 @@ data class ParserInput(val text:String, val begin:Int) {
 data class ParserOutput<T>(val result:T, val end:Int)
 
 data class Comment(val text:String, val beginIdx:Int, val endIdx:Int)
-data class NonComment(val text:String, val beginIdx:Int, val endIdx:Int)
+data class NonComment(val text:String, val beginIdx:Int, val endIdx:Int, val lastComment: Comment?)
 interface Expression
 data class CompressedProof(val labels:List<String>, val proof:String)
 data class SequenceOfSymbols(
@@ -32,10 +33,19 @@ object Parsers {
 
     fun traverseMetamathFile(text:String, exprProc: (MetamathContext,Expression) -> Unit):MetamathContext {
         val (_, code: List<NonComment>) = extractComments(text)
+        val comments = ArrayList<Comment>()
+        val sb = StringBuilder()
+        for (nonComment in code) {
+            if (nonComment.lastComment != null) {
+                comments.add(nonComment.lastComment.copy(beginIdx = sb.length))
+            }
+            sb.append(" ").append(nonComment.text)
+        }
         val ctx = MetamathContext()
         traverseBlock(
-            inp = ParserInput(text = code.asSequence().map { it.text }.joinToString(separator = " "), begin = 0),
+            inp = ParserInput(text = sb.toString(), begin = 0),
             context = ctx,
+            comments = comments,
             exprProc = exprProc
         )
         return ctx
@@ -44,6 +54,7 @@ object Parsers {
     private fun traverseBlock(
         inp:ParserInput,
         context:MetamathContext,
+        comments: List<Comment>,
         exprProc: (MetamathContext,Expression) -> Unit
     ):ParserOutput<Unit> {
         var idx = inp.begin
@@ -63,6 +74,7 @@ object Parsers {
                         val assertionsFromBlock = traverseBlock(
                             inp = inp.proceedTo(idx + 2),
                             context = childContext,
+                            comments = comments,
                             exprProc = exprProc
                         )
                         idx = assertionsFromBlock.end+1
@@ -75,12 +87,35 @@ object Parsers {
                     }
                 } else {
                     val sequenceOfSymbols = parseLabeledSequenceOfSymbols(inp.proceedTo(idx))
+                    context.lastComment = findLastCommentInBetween(comments, inp.begin, idx)
                     exprProc(context, sequenceOfSymbols.result)
                     idx = sequenceOfSymbols.end+1
                 }
             } else {
                 throw MetamathParserException()
             }
+        }
+    }
+
+    private fun findLastCommentInBetween(comments: List<Comment>, begin: Int, end: Int): String? {
+        var min = 0
+        var max = comments.size-1
+        var i = (min + max) / 2
+        while (min < max && !(begin <= comments[i].beginIdx && comments[i].beginIdx <= end)) {
+            if (comments[i].beginIdx < begin) {
+                min = i+1
+            } else if (end < comments[i].beginIdx) {
+                max = i-1
+            }
+            i = (min + max) / 2
+        }
+        while (i+1 < comments.size && begin <= comments[i+1].beginIdx && comments[i+1].beginIdx <= end) {
+            i++
+        }
+        return if (i < comments.size && begin <= comments[i].beginIdx && comments[i].beginIdx <= end) {
+            comments[i].text
+        } else {
+            null
         }
     }
 
@@ -109,7 +144,8 @@ object Parsers {
                     nonComments.add(NonComment(
                         text = text.substring(beginOfNonCommentIdx,idx),
                         beginIdx = beginOfNonCommentIdx,
-                        endIdx = idx-1
+                        endIdx = idx-1,
+                        lastComment = if (comments.isEmpty()) null else comments.last()
                     ))
                 }
             }

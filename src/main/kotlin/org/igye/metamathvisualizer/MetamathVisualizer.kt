@@ -31,7 +31,7 @@ fun main() {
     MetamathVisualizer.generateProofExplorer(
         assertions = assertions.values,
         version = "v8",
-        numOfThreads = 1,
+        numOfThreads = 8,
         pathToDirToSaveTo = "C:\\igye\\temp\\metamath\\new"
     )
 }
@@ -183,7 +183,7 @@ object MetamathVisualizer {
         return AssertionDto(
             type = getTypeStr(assertion),
             name = assertion.assertion.label,
-            description = "???",
+            description = assertion.description,
             varTypes = extractVarTypes(assertion),
             params = assertion.hypotheses.map { it.sequence.symbols },
             retVal = assertion.assertion.sequence.symbols,
