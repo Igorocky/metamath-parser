@@ -185,7 +185,7 @@ object MetamathVisualizer {
             name = assertion.assertion.label,
             description = assertion.description,
             varTypes = extractVarTypes(assertion),
-            params = assertion.hypotheses.map { it.sequence.symbols },
+            params = assertion.hypotheses.asSequence().filter { it.sequence.seqType == 'e' }.map { it.sequence.symbols }.toList(),
             retVal = assertion.assertion.sequence.symbols,
             proof = proof
         )
