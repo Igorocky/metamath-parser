@@ -2,12 +2,10 @@ package org.igye.metamathvisualizer
 
 import com.google.gson.Gson
 import org.igye.common.DebugTimer
+import org.igye.common.Utils
 import org.igye.common.Utils.inputStreamFromClassPath
 import org.igye.common.Utils.readStringFromClassPath
-import org.igye.metamathparser.Assertion
-import org.igye.metamathparser.CalculatedStackNode
-import org.igye.metamathparser.MetamathParserException
-import org.igye.metamathparser.StackNode
+import org.igye.metamathparser.*
 import org.igye.metamathvisualizer.CompressionUtils.compress
 import org.igye.metamathvisualizer.dto.*
 import java.io.File
@@ -24,18 +22,32 @@ import java.util.concurrent.atomic.AtomicReference
 import java.util.function.Function
 import java.util.stream.Collectors
 
+fun main() {
+    val assertions: Map<String, Assertion> =
+        Parsers.traverseMetamathFile(
+            text = File("C:\\igye\\projects\\kotlin\\metamath-parser\\src\\test\\resources\\set-reduced.mm").readText(),
+            ExpressionProcessor
+        ).getAssertions()
+    MetamathVisualizer.generateProofExplorer(
+        assertions = assertions.values,
+        version = "v8",
+        numOfThreads = 1,
+        pathToDirToSaveTo = "C:\\igye\\temp\\metamath\\new"
+    )
+}
+
 object MetamathVisualizer {
     private val filePathSeparatorRegex = "/|\\\\".toRegex()
     private val gson = Gson()
 
     fun generateProofExplorer(
-        assertions: List<Assertion>, version: String, numOfThreads: Int, pathToDirToSaveTo: String
+        assertions: Collection<Assertion>, version: String, numOfThreads: Int, pathToDirToSaveTo: String
     ) {
         println("Writing common files...")
         val dirToSaveTo = File(pathToDirToSaveTo)
-        if (dirToSaveTo.exists()) {
-            throw MetamathParserException("The directory already exists: " + dirToSaveTo.absolutePath)
-        }
+//        if (dirToSaveTo.exists()) {
+//            throw MetamathParserException("The directory already exists: " + dirToSaveTo.absolutePath)
+//        }
         val versionDir = File(dirToSaveTo, version)
         versionDir.mkdirs()
         copyUiFileToDir("/ui/css/styles.css", versionDir)
@@ -57,6 +69,7 @@ object MetamathVisualizer {
         copyUiFileToDir("/ui/js/components/MetamathAssertionView.js", versionDir)
         copyUiFileToDir("/ui/js/components/MetamathIndexTable.js", versionDir)
         copyUiFileToDir("/ui/js/components/MetamathIndexView.js", versionDir)
+
         val queue: Queue<Assertion> = ConcurrentLinkedQueue(assertions)
         val executorService = Executors.newFixedThreadPool(numOfThreads)
         val filesWrittenAtomic = AtomicInteger()
@@ -75,7 +88,7 @@ object MetamathVisualizer {
                         }
                         indexElems[assertion.assertion.beginIdx] = createIndexElemDto(dto)
                     } catch (e: Exception) {
-                        println(e.message)
+                        println("Error - ${e.message}")
                         e.printStackTrace()
                         errorOccurred.set(e)
                     }
@@ -93,7 +106,8 @@ object MetamathVisualizer {
         executorService.shutdown()
         executorService.awaitTermination(1, TimeUnit.DAYS)
         if (errorOccurred.get() != null) {
-            throw errorOccurred.get()!!
+            val err = errorOccurred.get()
+            throw err!!
         }
         println("Writing index...")
         createHtmlFile(
@@ -110,7 +124,6 @@ object MetamathVisualizer {
             elems = indexElems.asSequence().withIndex()
                 .map { (i,dto) ->
                     dto.copy(id = i)
-                    dto
                 }
                 .toList()
         )
@@ -205,8 +218,8 @@ object MetamathVisualizer {
     }
 
     private fun iterateNodes(root: StackNode, nodeConsumer: (StackNode) -> Unit) {
-        val processed: MutableSet<StackNode> = HashSet<StackNode>()
-        val toProcess: Stack<StackNode> = Stack<StackNode>()
+        val processed = HashSet<StackNode>()
+        val toProcess = Stack<StackNode>()
         toProcess.push(root)
         while (!toProcess.isEmpty()) {
             val curNode: StackNode = toProcess.pop()
@@ -241,8 +254,9 @@ object MetamathVisualizer {
         val content: String = readStringFromClassPath(fileInClassPath)
         val destFile = File(
             dir,
-            fileInClassPath.split(filePathSeparatorRegex).takeLast(numOfDirsToSkip + 1).joinToString(separator = "/")
+            fileInClassPath.split(filePathSeparatorRegex).drop(numOfDirsToSkip + 1).joinToString(separator = "/")
         )
+        destFile.parentFile.mkdirs()
         destFile.writeText(modifier.apply(content))
     }
 
@@ -261,6 +275,7 @@ object MetamathVisualizer {
 
     private fun copyFromClasspath(fileInClassPath: String, modifier: Function<String, String>, destFile: File) {
         val content: String = readStringFromClassPath(fileInClassPath)
+        destFile.parentFile.mkdirs()
         destFile.writeText(modifier.apply(content))
     }
 

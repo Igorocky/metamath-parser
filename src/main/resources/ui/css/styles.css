@@ -1,0 +1,15 @@
+.index-row:hover {
+    background-color: lightcyan;
+}
+
+.proof-row:hover {
+    background-color: rgb(255,255,235);
+}
+
+.color-selector-elem:hover {
+    box-shadow: 1px 1px 3px black;
+}
+
+.symbol-search-span:hover {
+    text-shadow: 1px 1px 3px gray;
+}

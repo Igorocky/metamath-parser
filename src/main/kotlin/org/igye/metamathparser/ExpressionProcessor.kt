@@ -96,7 +96,7 @@ object ExpressionProcessor: ((MetamathContext,Expression) -> Unit) {
                 } else if (arg is LabeledSequenceOfSymbols) {
                     proofStack.apply(arg)
                 } else {
-                    proofStack.apply((arg as Assertion))
+                    proofStack.apply(arg as Assertion)
                 }
             }
         }

@@ -1,6 +1,7 @@
 package org.igye.metamathparser
 
-import java.util.Collections.unmodifiableList
+import org.igye.common.Utils
+import org.igye.common.Utils.subList
 
 class ProofStack {
     private var nodeCounter = 0;
@@ -39,7 +40,7 @@ class ProofStack {
             }
         }
         val result = CalculatedStackNode(
-            args = unmodifiableList(stack.subList(baseStackIdx, stack.size)),
+            args = subList(stack, baseStackIdx, stack.size),
             substitution = substitution,
             assertion = assertion,
             value = applySubstitution(assertion.assertion.sequence.symbols, substitution)
