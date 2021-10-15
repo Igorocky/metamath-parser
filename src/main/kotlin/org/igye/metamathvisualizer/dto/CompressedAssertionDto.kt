@@ -8,5 +8,5 @@ data class CompressedAssertionDto(
     val v: Map<Int, Int>,
     val pa: List<List<Int>>,
     val r: List<Int>,
-    val p: List<CompressedStackNodeDto>,
+    val p: List<CompressedStackNodeDto>?,
 )

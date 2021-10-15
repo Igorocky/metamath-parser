@@ -12,14 +12,14 @@ object CompressionUtils {
 
     private fun compress(dto: CompressedAssertionDto): CompressedAssertionDto2 {
         return CompressedAssertionDto2(
-            s=dto.s.joinToString(separator = " "),
-                    t=dto.t,
-                    n=dto.n,
-                    d=dto.d,
-                    v=compressMapOfIntsToStr(dto.v),
-                    pa=compressListOfListOfInts(dto.pa),
-                    r=compressListOfIntsToStr(dto.r),
-                    p= dto.p.asSequence().map(CompressionUtils::compress).toList(),
+            s = dto.s.joinToString(separator = " "),
+            t = dto.t,
+            n = dto.n,
+            d = dto.d,
+            v = compressMapOfIntsToStr(dto.v),
+            pa = compressListOfListOfInts(dto.pa),
+            r = compressListOfIntsToStr(dto.r),
+            p = dto.p?.asSequence()?.map(CompressionUtils::compress)?.toList(),
         )
     }
 
@@ -28,13 +28,13 @@ object CompressionUtils {
         val strMap: Map<String, Int> = strings.second
         return CompressedAssertionDto(
             s = strings.first,
-                    t = dto.type,
-                    n = dto.name,
-                    d = dto.description,
-                    v = compress(dto.varTypes, strMap),
-                    pa = compress2(dto.params, strMap),
-                    r = compress(dto.retVal, strMap)!!,
-                    p = dto.proof.stream().map { p -> compress(p, strMap) }.collect(Collectors.toList()),
+            t = dto.type,
+            n = dto.name,
+            d = dto.description,
+            v = compress(dto.varTypes, strMap),
+            pa = compress2(dto.params, strMap),
+            r = compress(dto.retVal, strMap)!!,
+            p = dto.proof?.stream()?.map { p -> compress(p, strMap) }?.collect(Collectors.toList()),
         )
     }
 

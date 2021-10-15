@@ -178,7 +178,7 @@ object MetamathVisualizer {
             }
             uniqueSteps
         } else {
-            emptyList()
+            null
         }
         return AssertionDto(
             type = getTypeStr(assertion),

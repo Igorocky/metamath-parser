@@ -7,5 +7,5 @@ data class AssertionDto(
     val varTypes: Map<String, String>,
     val params: List<List<String>>,
     val retVal: List<String>,
-    val proof: List<StackNodeDto>,
+    val proof: List<StackNodeDto>?,
 )
