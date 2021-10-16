@@ -27,7 +27,8 @@ import kotlin.collections.HashSet
 fun main() {
     val assertions: Map<String, Assertion> =
         Parsers.traverseMetamathFile(
-            text = File("C:\\igye\\projects\\kotlin\\metamath-parser\\src\\test\\resources\\set-reduced.mm").readText(),
+            text = File("C:\\igye\\books\\metamath\\set.mm").readText(),
+//            text = File("C:\\igye\\projects\\kotlin\\metamath-parser\\src\\test\\resources\\set-reduced.mm").readText(),
             ExpressionProcessor
         ).getAssertions()
     MetamathVisualizer.generateProofExplorer(
@@ -35,6 +36,7 @@ fun main() {
         version = "v8",
         numOfThreads = 8,
         pathToDirToSaveTo = "C:\\igye\\temp\\metamath\\new"
+//        pathToDirToSaveTo = "C:\\igye\\temp\\metamath-reduced\\new"
     )
 }
 
@@ -167,10 +169,6 @@ object MetamathVisualizer {
                             substitution = node.substitution,
                             expr = node.value
                         )
-                        if (nodeDto.args?.isEmpty() == true) nodeDto = nodeDto.copy(args = null)
-                        if (nodeDto.params?.isEmpty() == true) nodeDto = nodeDto.copy(params = null)
-                        if (nodeDto.retVal?.isEmpty() == true) nodeDto = nodeDto.copy(retVal = null)
-                        if (nodeDto.substitution?.isEmpty() == true) nodeDto = nodeDto.copy(substitution = null)
                         nodes.add(nodeDto)
                     } else {
                         nodes.add(StackNodeDto(
@@ -195,19 +193,50 @@ object MetamathVisualizer {
         } else {
             null
         }
+        val params: List<List<String>> = assertion.hypotheses.asSequence()
+            .filter { it.sequence.seqType == 'e' }
+            .map { it.sequence.symbols }
+            .toList()
+        val retVal: List<String> = assertion.assertion.sequence.symbols
+        val allSymbols: Set<String> = extractAllSymbols(params, retVal, proofDto)
         var assertionDto = AssertionDto(
             type = getTypeStr(assertion),
             name = assertion.assertion.label,
             description = assertion.description,
-            varTypes = extractVariableTypes(assertion, proof),
-            params = assertion.hypotheses.asSequence()
-                .filter { it.sequence.seqType == 'e' }
-                .map { it.sequence.symbols }
-                .toList(),
-            retVal = assertion.assertion.sequence.symbols,
+            varTypes = extractVariableTypes(assertion, proof, allSymbols),
+            params = params,
+            retVal = retVal,
             proof = proofDto
         )
         return assertionDto
+    }
+
+    private fun extractAllSymbols(params: List<List<String>>, retVal: List<String>, proofDto: List<StackNodeDto>?): Set<String> {
+        val allSymbols = HashSet<String>()
+        for (param in params) {
+            allSymbols.addAll(param)
+        }
+        allSymbols.addAll(retVal)
+        if (proofDto != null) {
+            for (stackNodeDto in proofDto) {
+                if (stackNodeDto.params != null) {
+                    for (param in stackNodeDto.params) {
+                        allSymbols.addAll(param)
+                    }
+                }
+                if (stackNodeDto.retVal != null) {
+                    allSymbols.addAll(stackNodeDto.retVal)
+                }
+                if (stackNodeDto.substitution != null) {
+                    for ((varName, expr) in stackNodeDto.substitution) {
+                        allSymbols.add(varName)
+                        allSymbols.addAll(expr)
+                    }
+                }
+                allSymbols.addAll(stackNodeDto.expr)
+            }
+        }
+        return allSymbols
     }
 
     private fun removeDuplicates(nodes: List<StackNodeDto>): List<StackNodeDto> {
@@ -355,14 +384,14 @@ object MetamathVisualizer {
         return listOf("asrt", "$label.html")
     }
 
-    private fun extractVariableTypes(assertion: Assertion, proof: StackNode?): Map<String, String> {
+    private fun extractVariableTypes(assertion: Assertion, proof: StackNode?, allSymbols: Set<String>): Map<String, String> {
         return DebugTimer.run("extractVarTypes") {
             val varTypes = HashMap<String,String>()
-            extractVariableTypes(assertion, varTypes)
+            extractVariableTypes(assertion, varTypes, allSymbols)
             if (proof != null) {
                 iterateNodes(proof) {
                     if (it is CalculatedStackNode) {
-                        extractVariableTypes(it.assertion, varTypes)
+                        extractVariableTypes(it.assertion, varTypes, allSymbols)
                     }
                 }
             }
@@ -370,12 +399,14 @@ object MetamathVisualizer {
         }
     }
 
-    private fun extractVariableTypes(assertion: Assertion, varTypes: MutableMap<String,String>) {
+    private fun extractVariableTypes(assertion: Assertion, varTypes: MutableMap<String,String>, allSymbols: Set<String>) {
         for ((varName, varType) in assertion.visualizationData!!.variablesTypes) {
-            if (varTypes.containsKey(varName) && varTypes[varName] != varType) {
-                throw MetamathParserException("varTypes.containsKey(varName) && varTypes[varName] != varType")
+            if (allSymbols.contains(varName)) {
+                if (varTypes.containsKey(varName) && varTypes[varName] != varType) {
+                    throw MetamathParserException("varTypes.containsKey(varName) && varTypes[varName] != varType")
+                }
+                varTypes[varName] = varType
             }
-            varTypes[varName] = varType
         }
     }
 }

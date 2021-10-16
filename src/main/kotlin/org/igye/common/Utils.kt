@@ -47,6 +47,7 @@ object Utils {
         (files2 - files1).forEach { result.add("redundant $it") }
         files1.intersect(files2).asSequence()
             .filter { !compareContent(dir1,dir2,it) }
+            .take(30)
             .forEach { result.add("different $it") }
         return result
     }
