@@ -31,7 +31,6 @@ data class LabeledSequenceOfSymbols(val label:String, val sequence:SequenceOfSym
 
 object Parsers {
 
-    // TODO: 10/16/2021 why traverseMetamathFile returns Context? Try to return only assertions.
     fun traverseMetamathFile(text:String, exprProc: (MetamathContext,Expression) -> Unit):MetamathContext {
         val (_, code: List<NonComment>) = extractComments(text)
         val comments = ArrayList<Comment>()

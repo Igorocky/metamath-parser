@@ -75,8 +75,6 @@ object ExpressionProcessor: ((MetamathContext,Expression) -> Unit) {
         )
         addVarTypes(variablesTypes, assertionsReferencedFromProof)
         return Assertion(
-            // TODO: 10/16/2021 Why does Assertion need context?
-            context = ctx.getRootContext(),
             description = ctx.lastComment?.trim()?:"",
             hypotheses = hypotheses,
             assertion = expr,
