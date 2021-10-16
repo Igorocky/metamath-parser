@@ -31,6 +31,7 @@ data class LabeledSequenceOfSymbols(val label:String, val sequence:SequenceOfSym
 
 object Parsers {
 
+    // TODO: 10/16/2021 why traverseMetamathFile returns Context? Try to return only assertions.
     fun traverseMetamathFile(text:String, exprProc: (MetamathContext,Expression) -> Unit):MetamathContext {
         val (_, code: List<NonComment>) = extractComments(text)
         val comments = ArrayList<Comment>()
@@ -48,6 +49,13 @@ object Parsers {
             comments = comments,
             exprProc = exprProc
         )
+        for (assertion in ctx.getAssertions().values) {
+            for ((varName, varType) in assertion.visualizationData!!.variablesTypes) {
+                if (ctx.isConstant(varName) || !ctx.isConstant(varType)) {
+                    throw MetamathParserException("ctx.isConstant(varName) || !ctx.isConstant(varType)")
+                }
+            }
+        }
         return ctx
     }
 

@@ -48,3 +48,12 @@ $( Prove a theorem $)
        tt weq tt tze tpl tt weq tt tt weq wim tt a2
        tt tze tpl tt tt a1 mp mp
      $.
+
+$( A theorem with invalid proof (two proof steps were swapped in comparison to the previous theorem) $)
+    th2 $p |- t = t $=
+  $( Here is its proof: $)
+       tt tze tpl tt weq tt tt weq tt a2 tt tze tpl
+       tt weq tze tt tpl tt weq tt tt weq wim tt a2
+       tt tze tpl tt tt a1 mp mp
+     $.
+

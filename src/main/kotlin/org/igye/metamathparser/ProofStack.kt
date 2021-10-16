@@ -1,6 +1,5 @@
 package org.igye.metamathparser
 
-import org.igye.common.Utils
 import org.igye.common.Utils.subList
 
 class ProofStack {
@@ -9,13 +8,13 @@ class ProofStack {
 
     fun size() = stack.size
 
-    fun get(i:Int) = stack.get(i)
+    fun getLast() = stack.last()
 
-    fun apply(constStmt: LabeledSequenceOfSymbols) {
+    fun put(constStmt: LabeledSequenceOfSymbols) {
         if (constStmt.sequence.seqType != 'f' && constStmt.sequence.seqType != 'e') {
             throw MetamathParserException("constStmt.seqType != 'f' && constStmt.seqType != 'e'")
         }
-        add(StackNode(stmt = constStmt, value = constStmt.sequence.symbols))
+        put(StackNode(stmt = constStmt, value = constStmt.sequence.symbols))
     }
 
     fun apply(assertion: Assertion) {
@@ -46,12 +45,12 @@ class ProofStack {
             value = applySubstitution(assertion.assertion.sequence.symbols, substitution)
         )
         (0 until assertion.hypotheses.size).forEach { stack.removeAt(stack.size-1) }
-        add(result)
+        put(result)
     }
 
-    fun add(node: StackNode) {
+    fun put(node: StackNode) {
         if (node.getId() < 0) {
-            node.setId(nodeCounter++)
+            node.setId(++nodeCounter)
         }
         stack.add(node)
     }

@@ -53,8 +53,8 @@ class MetamathContext(
         return result
     }
 
-    fun variableExists(name:String): Boolean {
-        return variables?.contains(name)?:false || parent?.variableExists(name)?:false
+    fun isConstant(name:String): Boolean {
+        return getRootContext().constants!!.contains(name)
     }
 
     fun addConstants(constants:Set<String>) {
@@ -78,11 +78,7 @@ class MetamathContext(
         this.hypotheses!![name] = expr
     }
 
-    fun addAssertion(name:String,expr:Assertion) {
+    fun addAssertion(name:String, expr:Assertion) {
         getAssertions()[name] = expr
-    }
-
-    fun addAssertions(assertions:Map<String,Assertion>) {
-        getAssertions().putAll(assertions)
     }
 }

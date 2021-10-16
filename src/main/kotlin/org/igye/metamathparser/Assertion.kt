@@ -5,5 +5,12 @@ data class Assertion(
     val context: MetamathContext,
     val hypotheses:List<LabeledSequenceOfSymbols>,
     val assertion:LabeledSequenceOfSymbols,
-    val proof: StackNode? = null
-)
+    val assertionsReferencedFromProof:List<Any>,
+    val visualizationData: VisualizationData? = null,
+) {
+    init {
+        if (!assertionsReferencedFromProof.all { it is LabeledSequenceOfSymbols || it is Assertion }) {
+            throw MetamathParserException("!proofData.all { it is LabeledSequenceOfSymbols || it is Assertion }")
+        }
+    }
+}

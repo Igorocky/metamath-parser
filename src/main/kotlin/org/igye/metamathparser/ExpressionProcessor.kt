@@ -5,12 +5,12 @@ object ExpressionProcessor: ((MetamathContext,Expression) -> Unit) {
         when (expr) {
             is SequenceOfSymbols -> when (expr.seqType) {
                 'c' -> ctx.addConstants(expr.symbols.toSet())
-                'v' -> ctx.addVariables(expr.symbols.toSet())
+                'v' -> processVariableStmt(ctx, expr)
                 'd' -> ctx
                 else -> throw MetamathParserException()
             }
             is LabeledSequenceOfSymbols -> when (expr.sequence.seqType) {
-                'f' -> ctx.addHypothesis(expr.label, expr)
+                'f' -> processFloatingStmt(ctx, expr)
                 'e' -> ctx.addHypothesis(expr.label, expr)
                 'a' -> ctx.addAssertion(expr.label, createAssertion(ctx, expr))
                 'p' -> processTheorem(ctx, expr)
@@ -20,133 +20,118 @@ object ExpressionProcessor: ((MetamathContext,Expression) -> Unit) {
         }
     }
 
+    private fun processVariableStmt(ctx: MetamathContext, expr: SequenceOfSymbols) {
+        if (expr.symbols.any { ctx.isConstant(it) }) {
+            throw MetamathParserException("expr.symbols.any { ctx.isConstant(it) }")
+        }
+        ctx.addVariables(expr.symbols.toSet())
+    }
+
+    private fun processFloatingStmt(ctx: MetamathContext, expr: LabeledSequenceOfSymbols) {
+        val symbols = expr.sequence.symbols
+        if (symbols.size != 2) {
+            throw MetamathParserException("expr.sequence.symbols.size != 2")
+        }
+        if (!( ctx.isConstant(symbols[0]) && !ctx.isConstant(symbols[1]) )) {
+            throw MetamathParserException("!( ctx.isConstant(symbols[0]) && !ctx.isConstant(symbols[1]) )")
+        }
+        ctx.addHypothesis(expr.label, expr)
+    }
+
     private fun processTheorem(ctx: MetamathContext, expr: LabeledSequenceOfSymbols) {
-        val theorem = createAssertion(ctx, expr)
-        ctx.addAssertion(expr.label, theorem.copy(proof = verify(theorem, ctx)))
+        ctx.addAssertion(expr.label, createAssertion(ctx, expr))
     }
 
     private fun createAssertion(ctx: MetamathContext, expr: LabeledSequenceOfSymbols): Assertion {
-        val variables = getAllVariablesUsed(ctx, expr.sequence)
-        val hypotheses = ctx.getHypotheses {
+        val variables = getAllVariablesFromExprAndAllEssentialHypotheses(ctx, expr.sequence)
+        val variablesTypes = HashMap<String,String>()
+        val hypotheses: List<LabeledSequenceOfSymbols> = ctx.getHypotheses {
             when (it.sequence.seqType) {
-                'f' -> variables.contains(it.sequence.symbols[1])
+                'f' -> {
+                    val varName = it.sequence.symbols[1]
+                    if (variables.contains(varName)) {
+                        if (variablesTypes.containsKey(varName)) {
+                            throw MetamathParserException("variablesTypes.containsKey(varName)")
+                        } else {
+                            variablesTypes[varName] = it.sequence.symbols[0]
+                            true
+                        }
+                    } else {
+                        false
+                    }
+                }
                 'e' -> true
                 else -> throw MetamathParserException("Unexpected type of a hypothesis: ${it.sequence.seqType}")
             }
         }.sortedBy { it.beginIdx }
-        return Assertion(description = ctx.lastComment?:"", hypotheses = hypotheses, assertion = expr, context = ctx.getRootContext())
-    }
-
-    private fun getAllVariablesUsed(ctx: MetamathContext, expr: SequenceOfSymbols):Set<String> {
-        val result = HashSet<String>()
-        expr.symbols.asSequence().filter { ctx.variableExists(it) }.forEach { result.add(it) }
-        ctx.getHypotheses { it.sequence.seqType == 'e' }.forEach { essential ->
-            essential.sequence.symbols.asSequence()
-                .filter { ctx.variableExists(it) }
-                .forEach { result.add(it) }
+        if (variablesTypes.keys != variables) {
+            throw MetamathParserException("types.keys != variables")
         }
-        return result
-    }
-
-    private fun verify(theorem: Assertion, ctx: MetamathContext): StackNode {
-        val proofStack = ProofStack()
-        if (theorem.assertion.sequence.uncompressedProof != null) {
-            eval(theorem.assertion.sequence.uncompressedProof, proofStack, ctx)
-        } else {
-            eval(
-                compressedProof = theorem.assertion.sequence.compressedProof!!,
-                mandatoryHypotheses = theorem.hypotheses,
-                proofStack = proofStack,
-                ctx = ctx
+        val assertionsReferencedFromProof: List<Any> = getAssertionsReferencedFromProof(
+            ctx = ctx,
+            mandatoryHypotheses = hypotheses,
+            uncompressedProof = expr.sequence.uncompressedProof,
+            compressedProof = expr.sequence.compressedProof,
+        )
+        addVarTypes(variablesTypes, assertionsReferencedFromProof)
+        return Assertion(
+            // TODO: 10/16/2021 Why does Assertion need context?
+            context = ctx.getRootContext(),
+            description = ctx.lastComment?.trim()?:"",
+            hypotheses = hypotheses,
+            assertion = expr,
+            assertionsReferencedFromProof = assertionsReferencedFromProof,
+            visualizationData = VisualizationData(
+                variablesTypes = variablesTypes
             )
-        }
-        if (proofStack.size() != 1) {
-            throw MetamathParserException("proofStack.size() != 1")
-        }
-        val result: StackNode = proofStack.get(0)
-        if (theorem.assertion.sequence.symbols != result.value) {
-            throw MetamathParserException("theorem.symbols != result.value")
-        }
-        return result
+        )
     }
 
-    private fun eval(uncompressedProof:List<String>, proofStack:ProofStack, ctx: MetamathContext) {
-        for (label in uncompressedProof) {
-            apply(label, proofStack, ctx)
-        }
-    }
-
-    private fun eval(
-        compressedProof:CompressedProof,
-        mandatoryHypotheses:List<LabeledSequenceOfSymbols>,
-        proofStack:ProofStack,
-        ctx: MetamathContext
-    ) {
-        val args = ArrayList<Any>(mandatoryHypotheses)
-        compressedProof.labels.forEach { args.add(ctx.getHypothesis(it)?:ctx.getAssertions()[it]!!) }
-        val proof: List<String> = splitEncodedProof(compressedProof.proof)
-
-        for (step in proof) {
-            if ("Z".equals(step)) {
-                args.add(proofStack.get(proofStack.size()-1))
-            } else {
-                val arg = args[strToInt(step)-1]
-                if (arg is StackNode) {
-                    proofStack.add(arg)
-                } else if (arg is LabeledSequenceOfSymbols) {
-                    proofStack.apply(arg)
-                } else {
-                    proofStack.apply(arg as Assertion)
+    private fun addVarTypes(variablesTypes: MutableMap<String,String>, assertionsReferencedFromProof: List<Any>) {
+        for (assertion in assertionsReferencedFromProof) {
+            if (assertion is LabeledSequenceOfSymbols && assertion.sequence.seqType == 'f') {
+                val type = assertion.sequence.symbols[0]
+                val varName = assertion.sequence.symbols[1]
+                if (variablesTypes.containsKey(varName) && variablesTypes[varName] != type) {
+                    throw MetamathParserException("variablesTypes.containsKey(varName) && variablesTypes[varName] != type")
                 }
+                variablesTypes[varName] = type
             }
         }
     }
 
-    private fun apply(label:String, proofStack:ProofStack, ctx: MetamathContext) {
-        val hypothesis: LabeledSequenceOfSymbols? = ctx.getHypothesis(label)
-        if (hypothesis != null) {
-            proofStack.apply(hypothesis)
+    private fun getAssertionsReferencedFromProof(
+        ctx: MetamathContext,
+        mandatoryHypotheses: List<LabeledSequenceOfSymbols>,
+        uncompressedProof:List<String>?,
+        compressedProof:CompressedProof?
+    ): List<Any> {
+        if (compressedProof != null) {
+            val dataReferencedFromProof = ArrayList<Any>(mandatoryHypotheses)
+            compressedProof.labels.forEach { dataReferencedFromProof.add(ctx.getHypothesis(it)?:ctx.getAssertions()[it]!!) }
+            return dataReferencedFromProof
+        } else if (uncompressedProof != null) {
+            return uncompressedProof.map { ctx.getHypothesis(it)?:ctx.getAssertions()[it]!! }
         } else {
-            proofStack.apply(ctx.getAssertions()[label]!!)
+            return emptyList()
         }
     }
 
-    fun splitEncodedProof(proofStr: String): List<String> {
-        val result = ArrayList<String>()
-        val sb = StringBuilder()
-        for (i in 0 until proofStr.length) {
-            val c = proofStr[i]
-            if (c == 'Z') {
-                result.add("Z")
-            } else {
-                sb.append(c)
-                if ('A' <= c && c <= 'T') {
-                    result.add(sb.toString())
-                    sb.setLength(0)
+    private fun getAllVariablesFromExprAndAllEssentialHypotheses(ctx: MetamathContext, expr: SequenceOfSymbols):Set<String> {
+        val variables = HashSet<String>()
+        for (symbol in expr.symbols) {
+            if (!ctx.isConstant(symbol)) {
+                variables.add(symbol)
+            }
+        }
+        ctx.getHypotheses { it.sequence.seqType == 'e' }.forEach {
+            for (symbol in it.sequence.symbols) {
+                if (!ctx.isConstant(symbol)) {
+                    variables.add(symbol)
                 }
             }
         }
-        if (sb.length > 0) {
-            throw MetamathParserException("sb.length() > 0")
-        }
-        return result
+        return variables
     }
 
-    fun strToInt(str: String): Int {
-        var result = 0
-        var base = 1
-        for (i in str.length - 2 downTo 0) {
-            result += base * charToInt(str[i])
-            base *= 5
-        }
-        return result * 20 + charToInt(str[str.length - 1])
-    }
-
-    private fun charToInt(c: Char): Int {
-        return if ('A' <= c && c <= 'T') {
-            c.code - 64 //65 is A
-        } else {
-            c.code - 84 //85 is U
-        }
-    }
 }

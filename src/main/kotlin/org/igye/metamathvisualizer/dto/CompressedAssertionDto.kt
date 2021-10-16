@@ -6,7 +6,7 @@ data class CompressedAssertionDto(
     val n: String,
     val d: String,
     val v: Map<Int, Int>,
-    val pa: List<List<Int>>,
+    val pa: List<List<Int>?>?,
     val r: List<Int>,
     val p: List<CompressedStackNodeDto>?,
 )

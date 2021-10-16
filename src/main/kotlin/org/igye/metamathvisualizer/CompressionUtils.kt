@@ -72,14 +72,14 @@ object CompressionUtils {
                     p = compress2(dto.params, strMap),
                     r = compress(dto.retVal, strMap),
                     n = dto.numOfTypes,
-                    s = dto.substitution.entries.asSequence()
-                        .associate { (k,v) -> strMap[k]!! to compress(v, strMap)!! },
+                    s = dto.substitution?.entries?.asSequence()
+                        ?.associate { (k,v) -> strMap[k]!! to compress(v, strMap)!! },
             e = compress(dto.expr, strMap)!!,
         )
     }
 
     private fun compress(dto: CompressedStackNodeDto): String {
-        val result = ArrayList<String>()
+        val result = ArrayList<String?>()
         result.add(dto.i.toString())
         result.add(if (dto.a == null) "" else compressListOfIntsToStr(dto.a))
         result.add(dto.t.toString())
@@ -87,7 +87,7 @@ object CompressionUtils {
         result.add(if (dto.p == null) "" else compressListOfListOfInts(dto.p))
         result.add(dto.n.toString())
         result.add(if (dto.r == null) "" else compressListOfIntsToStr(dto.r))
-        result.add((if (dto.s == null) "" else compressMapOfIntListToStr(dto.s))!!)
+        result.add((if (dto.s == null) "" else compressMapOfIntListToStr(dto.s)))
         result.add(compressListOfIntsToStr(dto.e))
         return compressListOfStrings(result)
     }
@@ -135,7 +135,7 @@ object CompressionUtils {
     }
 
     private fun compress(dto: CompressedIndexElemDto): String {
-        val res: MutableList<String> = ArrayList()
+        val res: MutableList<String?> = ArrayList()
         res.add(dto.i.toString())
         res.add(dto.t.toString())
         res.add(dto.l)
@@ -145,8 +145,8 @@ object CompressionUtils {
         return compressListOfStrings(res)
     }
 
-    private fun compressListOfListOfInts(list: List<List<Int>>): String {
-        return list.stream().map({ compressListOfIntsToStr(it) }).collect(Collectors.joining(" "))
+    private fun compressListOfListOfInts(list: List<List<Int>?>?): String? {
+        return list?.stream()?.map({ compressListOfIntsToStr(it) })?.collect(Collectors.joining(" "))
     }
 
     fun intToStr(i: Int): String {
@@ -164,7 +164,7 @@ object CompressionUtils {
         }
     }
 
-    fun compressListOfStrings(strings: List<String>): String {
+    fun compressListOfStrings(strings: List<String?>): String {
         val sb = StringBuilder()
         for (i in strings.indices) {
             if (i != 0) {
@@ -175,7 +175,10 @@ object CompressionUtils {
         return sb.toString()
     }
 
-    private fun compressListOfIntsToStr(ints: List<Int>): String {
+    private fun compressListOfIntsToStr(ints: List<Int>?): String? {
+        if (ints == null) {
+            return null
+        }
         val sb = StringBuilder()
         for (i in ints) {
             sb.append(intToStr(i))
@@ -203,20 +206,20 @@ object CompressionUtils {
         return sb.toString().trim { it <= ' ' }
     }
 
-    private fun compress(list: List<String>, strMap: Map<String, Int>): List<Int> {
-        return list.asSequence().map { key: String ->
+    private fun compress(list: List<String>?, strMap: Map<String, Int>): List<Int>? {
+        return list?.asSequence()?.map { key: String ->
             strMap[key]!!
-        }.toList()
+        }?.toList()
     }
 
-    private fun compress2(list: List<List<String>>, strMap: Map<String, Int>): List<List<Int>> {
-        return list.asSequence()
-            .map {
+    private fun compress2(list: List<List<String>>?, strMap: Map<String, Int>): List<List<Int>?>? {
+        return list?.asSequence()
+            ?.map {
                 compress(
                     it,
                     strMap
                 )
-            }.toList()
+            }?.toList()
     }
 
     private fun compress(map: Map<String, String>, strMap: Map<String, Int>): Map<Int, Int> {

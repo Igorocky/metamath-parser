@@ -114,6 +114,8 @@ internal class ParsersTest {
             " Define the modus ponens inference rule ",
             " Prove a theorem ",
             " Here is its proof: ",
+            " A theorem with invalid proof (two proof steps were swapped in comparison to the previous theorem) ",
+            " Here is its proof: ",
         )
         assertEquals(expectedComments.size, comments.size)
         val actualComments = comments.map { it.text.filter { ch -> ch != '\r' } }
@@ -156,6 +158,7 @@ internal class ParsersTest {
             "<<maj:e>> |- ( P -> Q )",
             "<<mp:a>> |- Q",
             "<<th1:p>> |- t = t",
+            "<<th2:p>> |- t = t",
         ).map { it.split(' ') }
         assertEquals(expectedExpressions, expressins)
     }

@@ -1,12 +1,12 @@
 package org.igye.metamathvisualizer
 
-import com.google.gson.Gson
+import com.fasterxml.jackson.annotation.JsonInclude
+import com.fasterxml.jackson.databind.ObjectMapper
+import com.fasterxml.jackson.databind.SerializationFeature
 import org.igye.common.DebugTimer
-import org.igye.common.Utils
 import org.igye.common.Utils.inputStreamFromClassPath
 import org.igye.common.Utils.readStringFromClassPath
 import org.igye.metamathparser.*
-import org.igye.metamathvisualizer.CompressionUtils.compress
 import org.igye.metamathvisualizer.dto.*
 import java.io.File
 import java.io.FileOutputStream
@@ -21,6 +21,8 @@ import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicReference
 import java.util.function.Function
 import java.util.stream.Collectors
+import kotlin.collections.HashMap
+import kotlin.collections.HashSet
 
 fun main() {
     val assertions: Map<String, Assertion> =
@@ -38,7 +40,11 @@ fun main() {
 
 object MetamathVisualizer {
     private val filePathSeparatorRegex = "/|\\\\".toRegex()
-    private val gson = Gson()
+    private val MAPPER = ObjectMapper()
+    init {
+        MAPPER.setSerializationInclusion(JsonInclude.Include.NON_NULL)
+        MAPPER.configure(SerializationFeature.ORDER_MAP_ENTRIES_BY_KEYS, true)
+    }
 
     fun generateProofExplorer(
         assertions: Collection<Assertion>, version: String, numOfThreads: Int, pathToDirToSaveTo: String
@@ -114,7 +120,8 @@ object MetamathVisualizer {
             version,
             ".",
             "MetamathIndexView",
-            compress(buildIndex(indexElems.values)),
+//            compress(buildIndex(indexElems.values)),
+            buildIndex(indexElems.values),
             File(dirToSaveTo, "index.html")
         )
     }
@@ -133,40 +140,48 @@ object MetamathVisualizer {
         return IndexElemDto(
             id = -1,
             type = assertionDto.type.substring(0, 1),
-                    label = assertionDto.name,
-                    hypotheses = assertionDto.params,
-                    expression = assertionDto.retVal,
-                    varTypes = assertionDto.varTypes,
+            label = assertionDto.name,
+            hypotheses = assertionDto.params,
+            expression = assertionDto.retVal,
+            varTypes = assertionDto.varTypes,
         )
     }
 
     fun visualizeAssertion(assertion: Assertion): AssertionDto {
-        val proof = if (assertion.assertion.sequence.seqType == 'p') {
+        var proof: StackNode? = null
+        val proofDto: List<StackNodeDto>? = if (assertion.assertion.sequence.seqType == 'p') {
+            proof = ProofVerifier.verifyProof(assertion)
             val nodes: MutableList<StackNodeDto> = ArrayList<StackNodeDto>()
             DebugTimer.run("iterateNodes") {
-                iterateNodes(assertion.proof!!) { node: StackNode ->
+                iterateNodes(proof) { node: StackNode ->
                     if (node is CalculatedStackNode) {
-                        nodes.add(StackNodeDto(
+                        var nodeDto = StackNodeDto(
                             id = node.getId(),
                             args = node.args.map { it.getId() },
                             type = node.assertion.assertion.sequence.seqType.uppercase(),
                             label = node.assertion.assertion.label,
                             params = node.assertion.hypotheses.map { it.sequence.symbols },
-                            numOfTypes = node.assertion.hypotheses.asSequence().filter { it.sequence.seqType == 'f' }.count(),
+                            numOfTypes = node.assertion.hypotheses.asSequence().filter { it.sequence.seqType == 'f' }
+                                .count(),
                             retVal = node.assertion.assertion.sequence.symbols,
                             substitution = node.substitution,
                             expr = node.value
-                        ))
+                        )
+                        if (nodeDto.args?.isEmpty() == true) nodeDto = nodeDto.copy(args = null)
+                        if (nodeDto.params?.isEmpty() == true) nodeDto = nodeDto.copy(params = null)
+                        if (nodeDto.retVal?.isEmpty() == true) nodeDto = nodeDto.copy(retVal = null)
+                        if (nodeDto.substitution?.isEmpty() == true) nodeDto = nodeDto.copy(substitution = null)
+                        nodes.add(nodeDto)
                     } else {
                         nodes.add(StackNodeDto(
                             id = node.getId(),
-                            args = emptyList(),
+                            args = null,
                             type = node.stmt!!.sequence.seqType.uppercase(),
                             label = node.stmt!!.label,
-                            params = emptyList(),
+                            params = null,
                             numOfTypes = 0,
-                            retVal = emptyList(),
-                            substitution = emptyMap(),
+                            retVal = null,
+                            substitution = null,
                             expr = node.stmt.sequence.symbols
                         ))
                     }
@@ -180,15 +195,19 @@ object MetamathVisualizer {
         } else {
             null
         }
-        return AssertionDto(
+        var assertionDto = AssertionDto(
             type = getTypeStr(assertion),
             name = assertion.assertion.label,
             description = assertion.description,
-            varTypes = extractVarTypes(assertion),
-            params = assertion.hypotheses.asSequence().filter { it.sequence.seqType == 'e' }.map { it.sequence.symbols }.toList(),
+            varTypes = extractVariableTypes(assertion, proof),
+            params = assertion.hypotheses.asSequence()
+                .filter { it.sequence.seqType == 'e' }
+                .map { it.sequence.symbols }
+                .toList(),
             retVal = assertion.assertion.sequence.symbols,
-            proof = proof
+            proof = proofDto
         )
+        return assertionDto
     }
 
     private fun removeDuplicates(nodes: List<StackNodeDto>): List<StackNodeDto> {
@@ -206,8 +225,8 @@ object MetamathVisualizer {
             if (existingNode == null) {
                 exprToNode[exprStr] = node
                 nodeIdRemap[node.id] = node.id
-                if (node.args.isNotEmpty()) {
-                    node.args = node.args.map { nodeIdRemap[it]!! }
+                if (node.args?.isNotEmpty()?:false) {
+                    node.args = node.args?.map { nodeIdRemap[it]!! }
                 }
                 result.add(node)
             } else {
@@ -282,7 +301,10 @@ object MetamathVisualizer {
     private fun createHtmlFile(
         version: String?, relPathToRoot: String, viewComponentName: String, viewProps: Any, file: File
     ) {
-        val viewPropsStr: String = gson.toJson(gson.toJson(viewProps))
+        file.parentFile.mkdirs()
+        file.writeText(MAPPER.writeValueAsString(viewProps))
+        if (true) return
+        val viewPropsStr: String = MAPPER.writeValueAsString(MAPPER.writeValueAsString(viewProps))
         val decompressionFunctionName = when(viewProps) {
             is CompressedAssertionDto2 -> "decompressAssertionDto"
             is CompressedIndexDto2 -> "decompressIndexDto"
@@ -315,7 +337,8 @@ object MetamathVisualizer {
             version,
             relPathToRoot,
             "MetamathAssertionView",
-            compress(assertionDto),
+//            compress(assertionDto),
+            assertionDto,
             File(dataDir, relPath.joinToString(separator = "/"))
         )
     }
@@ -332,11 +355,27 @@ object MetamathVisualizer {
         return listOf("asrt", "$label.html")
     }
 
-    private fun extractVarTypes(assertion: Assertion): Map<String, String> {
+    private fun extractVariableTypes(assertion: Assertion, proof: StackNode?): Map<String, String> {
         return DebugTimer.run("extractVarTypes") {
-            val symbols: Set<String> = assertion.hypotheses.asSequence().flatMap { it.sequence.symbols }.toSet()
-            assertion.context.getHypotheses { it.sequence.seqType == 'f' && symbols.contains(it.sequence.symbols[1])}
-                .associate { it.sequence.symbols[1] to it.sequence.symbols[0] }
+            val varTypes = HashMap<String,String>()
+            extractVariableTypes(assertion, varTypes)
+            if (proof != null) {
+                iterateNodes(proof) {
+                    if (it is CalculatedStackNode) {
+                        extractVariableTypes(it.assertion, varTypes)
+                    }
+                }
+            }
+            varTypes
+        }
+    }
+
+    private fun extractVariableTypes(assertion: Assertion, varTypes: MutableMap<String,String>) {
+        for ((varName, varType) in assertion.visualizationData!!.variablesTypes) {
+            if (varTypes.containsKey(varName) && varTypes[varName] != varType) {
+                throw MetamathParserException("varTypes.containsKey(varName) && varTypes[varName] != varType")
+            }
+            varTypes[varName] = varType
         }
     }
 }
