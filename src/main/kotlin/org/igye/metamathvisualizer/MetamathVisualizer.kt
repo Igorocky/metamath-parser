@@ -21,23 +21,25 @@ import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicReference
 import java.util.function.Function
 import java.util.stream.Collectors
-import kotlin.collections.HashMap
-import kotlin.collections.HashSet
 
 fun main() {
-    val assertions: Map<String, Assertion> =
+    val assertions: Map<String, Assertion> = DebugTimer.run("parseMetamathFile") {
         Parsers.parseMetamathFile(
             text = File("C:\\igye\\books\\metamath\\set.mm").readText(),
 //            text = File("C:\\igye\\projects\\kotlin\\metamath-parser\\src\\test\\resources\\set-reduced.mm").readText(),
             ExpressionProcessor
         ).getAssertions()
-    MetamathVisualizer.generateProofExplorer(
-        assertions = assertions.values,
-        version = "v8",
-        numOfThreads = 8,
-        pathToDirToSaveTo = "C:\\igye\\temp\\metamath\\new"
+    }
+    DebugTimer.run("generateProofExplorer") {
+        MetamathVisualizer.generateProofExplorer(
+            assertions = assertions.values,
+            version = "v8",
+            numOfThreads = 8,
+            pathToDirToSaveTo = "C:\\igye\\temp\\metamath\\new"
 //        pathToDirToSaveTo = "C:\\igye\\temp\\metamath-reduced\\new"
-    )
+        )
+    }
+    println(DebugTimer.getStats())
 }
 
 object MetamathVisualizer {
@@ -154,41 +156,37 @@ object MetamathVisualizer {
         if (assertion.assertion.sequence.seqType == 'p') {
             proof = ProofVerifier.verifyProof(assertion)
             val nodes: MutableList<StackNodeDto> = ArrayList<StackNodeDto>()
-            DebugTimer.run("iterateNodes") {
-                iterateNodes(proof) { node: StackNode ->
-                    if (node is CalculatedStackNode) {
-                        var nodeDto = StackNodeDto(
-                            id = node.getId(),
-                            args = node.args.map { it.getId() },
-                            type = node.assertion.assertion.sequence.seqType.uppercase(),
-                            label = node.assertion.assertion.label,
-                            params = node.assertion.hypotheses.map { it.sequence.symbols },
-                            numOfTypes = node.assertion.hypotheses.asSequence().filter { it.sequence.seqType == 'f' }
-                                .count(),
-                            retVal = node.assertion.assertion.sequence.symbols,
-                            substitution = node.substitution,
-                            expr = node.value
-                        )
-                        nodes.add(nodeDto)
-                    } else {
-                        nodes.add(StackNodeDto(
-                            id = node.getId(),
-                            args = null,
-                            type = node.stmt!!.sequence.seqType.uppercase(),
-                            label = node.stmt!!.label,
-                            params = null,
-                            numOfTypes = 0,
-                            retVal = null,
-                            substitution = null,
-                            expr = node.stmt.sequence.symbols
-                        ))
-                    }
+            iterateNodes(proof) { node: StackNode ->
+                if (node is CalculatedStackNode) {
+                    var nodeDto = StackNodeDto(
+                        id = node.getId(),
+                        args = node.args.map { it.getId() },
+                        type = node.assertion.assertion.sequence.seqType.uppercase(),
+                        label = node.assertion.assertion.label,
+                        params = node.assertion.hypotheses.map { it.sequence.symbols },
+                        numOfTypes = node.assertion.hypotheses.asSequence().filter { it.sequence.seqType == 'f' }
+                            .count(),
+                        retVal = node.assertion.assertion.sequence.symbols,
+                        substitution = node.substitution,
+                        expr = node.value
+                    )
+                    nodes.add(nodeDto)
+                } else {
+                    nodes.add(StackNodeDto(
+                        id = node.getId(),
+                        args = null,
+                        type = node.stmt!!.sequence.seqType.uppercase(),
+                        label = node.stmt!!.label,
+                        params = null,
+                        numOfTypes = 0,
+                        retVal = null,
+                        substitution = null,
+                        expr = node.stmt.sequence.symbols
+                    ))
                 }
             }
             Collections.sort(nodes, Comparator.comparing { it.id })
-            val uniqueSteps: List<StackNodeDto> = DebugTimer.run("remove-duplicate-steps") {
-                removeDuplicates(nodes)
-            }
+            val uniqueSteps: List<StackNodeDto> = removeDuplicates(nodes)
             proofDto = uniqueSteps
         }
         val params: List<List<String>> = assertion.hypotheses.asSequence()
@@ -316,7 +314,10 @@ object MetamathVisualizer {
     private fun copyFromClasspath(fileInClassPath: String, modifier: Function<String, String>, destFile: File) {
         val content: String = readStringFromClassPath(fileInClassPath)
         destFile.parentFile.mkdirs()
-        destFile.writeText(modifier.apply(content))
+        val text = modifier.apply(content)
+        DebugTimer.run("destFile.writeText") {
+            destFile.writeText(text)
+        }
     }
 
     private fun createHtmlFile(
@@ -373,18 +374,16 @@ object MetamathVisualizer {
     }
 
     private fun extractVariableTypes(assertion: Assertion, proof: StackNode?, allSymbols: Set<String>): Map<String, String> {
-        return DebugTimer.run("extractVarTypes") {
-            val varTypes = HashMap<String,String>()
-            extractVariableTypes(assertion, varTypes, allSymbols)
-            if (proof != null) {
-                iterateNodes(proof) {
-                    if (it is CalculatedStackNode) {
-                        extractVariableTypes(it.assertion, varTypes, allSymbols)
-                    }
+        val varTypes = HashMap<String,String>()
+        extractVariableTypes(assertion, varTypes, allSymbols)
+        if (proof != null) {
+            iterateNodes(proof) {
+                if (it is CalculatedStackNode) {
+                    extractVariableTypes(it.assertion, varTypes, allSymbols)
                 }
             }
-            varTypes
         }
+        return varTypes
     }
 
     private fun extractVariableTypes(assertion: Assertion, varTypes: MutableMap<String,String>, allSymbols: Set<String>) {

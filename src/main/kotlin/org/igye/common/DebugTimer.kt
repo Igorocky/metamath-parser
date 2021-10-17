@@ -1,12 +1,11 @@
 package org.igye.common
 
 
+import java.math.BigDecimal
+import java.math.RoundingMode
 import java.time.Duration
 import java.time.Instant
 import java.util.*
-import java.util.concurrent.Callable
-import java.util.concurrent.ConcurrentHashMap
-import java.util.function.Function
 import java.util.stream.Collectors
 
 object DebugTimer {
@@ -40,10 +39,10 @@ object DebugTimer {
         )
     }
 
-    fun getStats():String {
-            val durationsMap = HashMap<String, Pair<Duration, List<Duration>>>()
-            for ((_, value) in accumulatedDurations) {
-                for ((label, value) in value.entries) {
+    fun getStats(): String {
+        val durationsMap = HashMap<String, Pair<Duration, List<Duration>>>()
+        for ((_, value) in accumulatedDurations) {
+            for ((label, value) in value.entries) {
                 val durations = durationsMap.computeIfAbsent(
                     label,
                     { Pair(Duration.ZERO, ArrayList<Duration>()) }
@@ -53,19 +52,21 @@ object DebugTimer {
                     append(durations.second, value)
                 )
             }
-            }
-            return durationsMap.entries.stream()
-                .sorted(compareBy<MutableMap.MutableEntry<String, Pair<Duration, List<Duration>>>?>({it!!.value.first}).reversed())
-                .map { (key, value): Map.Entry<String, Pair<Duration, List<Duration>>> ->
-                    (key + " - " + value.first.toMillis()
-                            + if (value.second.size > 1) value.second.asSequence()
-                        .map { it.toMillis() }
-                        .sortedDescending()
-                        .map(Objects::toString)
-                        .joinToString(separator = ", ", prefix = " [", postfix = "]") else "")
-                }
-                .collect(Collectors.joining("\n"))
         }
+        return durationsMap.entries.stream()
+            .sorted(compareBy<MutableMap.MutableEntry<String, Pair<Duration, List<Duration>>>?>({ it!!.value.first }).reversed())
+            .map { (key, value): Map.Entry<String, Pair<Duration, List<Duration>>> ->
+                (key + " - " + millisToSeconds(value.first.toMillis())
+                        + if (value.second.size > 1) value.second.asSequence()
+                    .map { millisToSeconds(it.toMillis()) }
+                    .sortedDescending()
+                    .map(Objects::toString)
+                    .joinToString(separator = ", ", prefix = " [", postfix = "]") else "")
+            }
+            .collect(Collectors.joining("\n"))
+    }
+
+    private fun millisToSeconds(millis: Long): BigDecimal = BigDecimal(millis).divide(BigDecimal(1000L), RoundingMode.HALF_UP).setScale(3)
 
     private fun <T> append(list: List<T>, elem: T): List<T> {
         val result = ArrayList(list)

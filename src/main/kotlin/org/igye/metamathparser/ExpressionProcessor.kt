@@ -12,8 +12,7 @@ object ExpressionProcessor: ((MetamathContext,Expression) -> Unit) {
             is LabeledSequenceOfSymbols -> when (expr.sequence.seqType) {
                 'f' -> processFloatingStmt(ctx, expr)
                 'e' -> ctx.addHypothesis(expr.label, expr)
-                'a' -> ctx.addAssertion(expr.label, createAssertion(ctx, expr))
-                'p' -> processTheorem(ctx, expr)
+                'a', 'p' -> ctx.addAssertion(expr.label, createAssertion(ctx, expr))
                 else -> throw MetamathParserException()
             }
             else -> throw MetamathParserException()
@@ -36,10 +35,6 @@ object ExpressionProcessor: ((MetamathContext,Expression) -> Unit) {
             throw MetamathParserException("!( ctx.isConstant(symbols[0]) && !ctx.isConstant(symbols[1]) )")
         }
         ctx.addHypothesis(expr.label, expr)
-    }
-
-    private fun processTheorem(ctx: MetamathContext, expr: LabeledSequenceOfSymbols) {
-        ctx.addAssertion(expr.label, createAssertion(ctx, expr))
     }
 
     private fun createAssertion(ctx: MetamathContext, expr: LabeledSequenceOfSymbols): Assertion {
