@@ -36,7 +36,7 @@ object Utils {
             return files.asSequence().map { it.toRelativeString(dir) }.toSet()
         }
         fun getContent(dir: File, fileRelPath: String): ByteArray = (File(dir.absolutePath + "/" + fileRelPath)).readBytes()
-        fun compareContent(dir1: File, dir2: File, fileRelPath: String) =
+        fun contentEquals(dir1: File, dir2: File, fileRelPath: String) =
             getContent(dir1,fileRelPath).contentEquals(getContent(dir2,fileRelPath))
 
         val result = ArrayList<String>()
@@ -46,8 +46,7 @@ object Utils {
         (files1 - files2).forEach { result.add("missing   $it") }
         (files2 - files1).forEach { result.add("redundant $it") }
         files1.intersect(files2).asSequence()
-            .filter { !compareContent(dir1,dir2,it) }
-            .take(30)
+            .filter { !contentEquals(dir1,dir2,it) }
             .forEach { result.add("different $it") }
         return result
     }

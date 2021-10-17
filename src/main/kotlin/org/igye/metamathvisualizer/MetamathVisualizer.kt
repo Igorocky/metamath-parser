@@ -26,7 +26,7 @@ import kotlin.collections.HashSet
 
 fun main() {
     val assertions: Map<String, Assertion> =
-        Parsers.traverseMetamathFile(
+        Parsers.parseMetamathFile(
             text = File("C:\\igye\\books\\metamath\\set.mm").readText(),
 //            text = File("C:\\igye\\projects\\kotlin\\metamath-parser\\src\\test\\resources\\set-reduced.mm").readText(),
             ExpressionProcessor
@@ -53,9 +53,9 @@ object MetamathVisualizer {
     ) {
         println("Writing common files...")
         val dirToSaveTo = File(pathToDirToSaveTo)
-//        if (dirToSaveTo.exists()) {
-//            throw MetamathParserException("The directory already exists: " + dirToSaveTo.absolutePath)
-//        }
+        if (dirToSaveTo.exists()) {
+            throw MetamathParserException("The directory already exists: " + dirToSaveTo.absolutePath)
+        }
         val versionDir = File(dirToSaveTo, version)
         versionDir.mkdirs()
         copyUiFileToDir("/ui/css/styles.css", versionDir)
@@ -322,9 +322,6 @@ object MetamathVisualizer {
     private fun createHtmlFile(
         version: String?, relPathToRoot: String, viewComponentName: String, viewProps: Any, file: File
     ) {
-        file.parentFile.mkdirs()
-        file.writeText(MAPPER.writeValueAsString(viewProps))
-        if (true) return
         val viewPropsStr: String = MAPPER.writeValueAsString(MAPPER.writeValueAsString(viewProps))
         val decompressionFunctionName = when(viewProps) {
             is CompressedAssertionDto2 -> "decompressAssertionDto"
@@ -372,7 +369,7 @@ object MetamathVisualizer {
     }
 
     private fun createRelPathToSaveTo(label: String): List<String> {
-        return listOf("asrt", "$label-${label.hashCode()}.html")
+        return listOf("asrt", "$label.html")
     }
 
     private fun extractVariableTypes(assertion: Assertion, proof: StackNode?, allSymbols: Set<String>): Map<String, String> {

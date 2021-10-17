@@ -6,13 +6,13 @@ object ProofVerifier {
         val proofStack = ProofStack()
         if (theorem.assertion.sequence.uncompressedProof != null) {
             eval(
-                dataReferencedFromProof = theorem.assertionsReferencedFromProof,
+                assertionsReferencedFromProof = theorem.assertionsReferencedFromProof,
                 proofStack = proofStack,
             )
         } else {
             eval(
                 compressedProof = theorem.assertion.sequence.compressedProof!!,
-                dataReferencedFromProof = theorem.assertionsReferencedFromProof,
+                assertionsReferencedFromProof = theorem.assertionsReferencedFromProof,
                 proofStack = proofStack,
             )
         }
@@ -26,8 +26,8 @@ object ProofVerifier {
         return result
     }
 
-    private fun eval(dataReferencedFromProof:List<Any>, proofStack:ProofStack) {
-        for (step in dataReferencedFromProof) {
+    private fun eval(assertionsReferencedFromProof:List<Any>, proofStack:ProofStack) {
+        for (step in assertionsReferencedFromProof) {
             if (step is LabeledSequenceOfSymbols) {
                 proofStack.put(step)
             } else {
@@ -38,10 +38,10 @@ object ProofVerifier {
 
     private fun eval(
         compressedProof:CompressedProof,
-        dataReferencedFromProof:List<Any>,
+        assertionsReferencedFromProof:List<Any>,
         proofStack:ProofStack,
     ) {
-        val args = ArrayList<Any>(dataReferencedFromProof)
+        val args = ArrayList<Any>(assertionsReferencedFromProof)
         val proof: List<String> = splitEncodedProof(compressedProof.proof)
 
         for (step in proof) {

@@ -10,7 +10,7 @@ internal class ProofVerifierTest {
     fun successfully_verifies_all_noncompressed_valid_proofs() {
         //given
         val assertions: Map<String, Assertion> =
-            Parsers.traverseMetamathFile(text = Utils.readStringFromClassPath("/demo0.mm"), ExpressionProcessor).getAssertions()
+            Parsers.parseMetamathFile(text = Utils.readStringFromClassPath("/demo0.mm"), ExpressionProcessor).getAssertions()
 
         //when
         val node = ProofVerifier.verifyProof(assertions["th1"]!!)
@@ -23,7 +23,7 @@ internal class ProofVerifierTest {
     fun fails_to_verify_invalid_noncompressed_proof() {
         //given
         val assertions: Map<String, Assertion> =
-            Parsers.traverseMetamathFile(text = Utils.readStringFromClassPath("/demo0.mm"), ExpressionProcessor).getAssertions()
+            Parsers.parseMetamathFile(text = Utils.readStringFromClassPath("/demo0.mm"), ExpressionProcessor).getAssertions()
 
         //when
         var errorMessage: String? = null
@@ -41,7 +41,7 @@ internal class ProofVerifierTest {
     fun successfully_verifies_all_compressed_valid_proofs() {
         //given
         val assertions: Map<String, Assertion> =
-            Parsers.traverseMetamathFile(text = Utils.readStringFromClassPath("/set-reduced.mm"), ExpressionProcessor).getAssertions()
+            Parsers.parseMetamathFile(text = Utils.readStringFromClassPath("/set-reduced.mm"), ExpressionProcessor).getAssertions()
 
         //when
         val verifiedTheorems = assertions.values.asSequence()
