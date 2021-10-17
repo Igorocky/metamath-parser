@@ -57,6 +57,10 @@ class MetamathContext(
         return getRootContext().constants!!.contains(name)
     }
 
+    fun isVariable(name:String): Boolean {
+        return variables?.contains(name)?:parent?.isVariable(name)?:false
+    }
+
     fun addConstants(constants:Set<String>) {
         if (parent != null) {
             throw MetamathParserException("Constant declaration is allowed only in the outermost block.")

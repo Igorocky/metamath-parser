@@ -4,7 +4,7 @@ object ExpressionProcessor: ((MetamathContext,Expression) -> Unit) {
     override fun invoke(ctx: MetamathContext, expr: Expression) {
         when (expr) {
             is SequenceOfSymbols -> when (expr.seqType) {
-                'c' -> ctx.addConstants(expr.symbols.toSet())
+                'c' -> processConstantStmt(ctx, expr)
                 'v' -> processVariableStmt(ctx, expr)
                 'd' -> ctx
                 else -> throw MetamathParserException()
@@ -19,9 +19,16 @@ object ExpressionProcessor: ((MetamathContext,Expression) -> Unit) {
         }
     }
 
+    private fun processConstantStmt(ctx: MetamathContext, expr: SequenceOfSymbols) {
+        if (expr.symbols.any { ctx.isConstant(it) || ctx.isVariable(it) }) {
+            throw MetamathParserException("expr.symbols.any { ctx.isConstant(it) || ctx.isVariable(it) }")
+        }
+        ctx.addConstants(expr.symbols.toSet())
+    }
+
     private fun processVariableStmt(ctx: MetamathContext, expr: SequenceOfSymbols) {
-        if (expr.symbols.any { ctx.isConstant(it) }) {
-            throw MetamathParserException("expr.symbols.any { ctx.isConstant(it) }")
+        if (expr.symbols.any { ctx.isConstant(it) || ctx.isVariable(it) }) {
+            throw MetamathParserException("expr.symbols.any { ctx.isConstant(it) || ctx.isVariable(it) }")
         }
         ctx.addVariables(expr.symbols.toSet())
     }
@@ -31,8 +38,8 @@ object ExpressionProcessor: ((MetamathContext,Expression) -> Unit) {
         if (symbols.size != 2) {
             throw MetamathParserException("expr.sequence.symbols.size != 2")
         }
-        if (!( ctx.isConstant(symbols[0]) && !ctx.isConstant(symbols[1]) )) {
-            throw MetamathParserException("!( ctx.isConstant(symbols[0]) && !ctx.isConstant(symbols[1]) )")
+        if (!( ctx.isConstant(symbols[0]) && ctx.isVariable(symbols[1]) )) {
+            throw MetamathParserException("!( ctx.isConstant(symbols[0]) && ctx.isVariable(symbols[1]) )")
         }
         ctx.addHypothesis(expr.label, expr)
     }
@@ -113,14 +120,18 @@ object ExpressionProcessor: ((MetamathContext,Expression) -> Unit) {
     private fun getAllVariablesFromExprAndAllEssentialHypotheses(ctx: MetamathContext, expr: SequenceOfSymbols):Set<String> {
         val variables = HashSet<String>()
         for (symbol in expr.symbols) {
-            if (!ctx.isConstant(symbol)) {
+            if (ctx.isVariable(symbol)) {
                 variables.add(symbol)
+            } else if (!ctx.isConstant(symbol)) {
+                throw MetamathParserException()
             }
         }
         ctx.getHypotheses { it.sequence.seqType == 'e' }.forEach {
             for (symbol in it.sequence.symbols) {
-                if (!ctx.isConstant(symbol)) {
+                if (ctx.isVariable(symbol)) {
                     variables.add(symbol)
+                } else if (!ctx.isConstant(symbol)) {
+                    throw MetamathParserException()
                 }
             }
         }
