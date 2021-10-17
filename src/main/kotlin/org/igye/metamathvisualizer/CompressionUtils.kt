@@ -189,7 +189,8 @@ object CompressionUtils {
 
     private fun compressMapOfIntsToStr(map: Map<Int, Int>): String {
         val sb = StringBuilder()
-        for ((key, value) in map) {
+        val sortedEntries = map.entries.sortedBy { entry -> entry.key }
+        for ((key, value) in sortedEntries) {
             sb.append(intToStr(key))
             sb.append(intToStr(value))
         }
