@@ -151,7 +151,8 @@ object MetamathVisualizer {
 
     fun visualizeAssertion(assertion: Assertion): AssertionDto {
         var proof: StackNode? = null
-        val proofDto: List<StackNodeDto>? = if (assertion.assertion.sequence.seqType == 'p') {
+        var proofDto: List<StackNodeDto>? = null
+        if (assertion.assertion.sequence.seqType == 'p') {
             proof = ProofVerifier.verifyProof(assertion)
             val nodes: MutableList<StackNodeDto> = ArrayList<StackNodeDto>()
             DebugTimer.run("iterateNodes") {
@@ -189,9 +190,7 @@ object MetamathVisualizer {
             val uniqueSteps: List<StackNodeDto> = DebugTimer.run("remove-duplicate-steps") {
                 removeDuplicates(nodes)
             }
-            uniqueSteps
-        } else {
-            null
+            proofDto = uniqueSteps
         }
         val params: List<List<String>> = assertion.hypotheses.asSequence()
             .filter { it.sequence.seqType == 'e' }
@@ -226,12 +225,6 @@ object MetamathVisualizer {
                 }
                 if (stackNodeDto.retVal != null) {
                     allSymbols.addAll(stackNodeDto.retVal)
-                }
-                if (stackNodeDto.substitution != null) {
-                    for ((varName, expr) in stackNodeDto.substitution) {
-                        allSymbols.add(varName)
-                        allSymbols.addAll(expr)
-                    }
                 }
                 allSymbols.addAll(stackNodeDto.expr)
             }
@@ -381,7 +374,7 @@ object MetamathVisualizer {
     }
 
     private fun createRelPathToSaveTo(label: String): List<String> {
-        return listOf("asrt", "$label.html")
+        return listOf("asrt", "$label-${label.hashCode()}.html")
     }
 
     private fun extractVariableTypes(assertion: Assertion, proof: StackNode?, allSymbols: Set<String>): Map<String, String> {
