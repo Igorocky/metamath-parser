@@ -122,8 +122,7 @@ object MetamathVisualizer {
             version,
             ".",
             "MetamathIndexView",
-//            compress(buildIndex(indexElems.values)),
-            buildIndex(indexElems.values),
+            CompressionUtils.compress(buildIndex(indexElems.values)),
             File(dirToSaveTo, "index.html")
         )
     }
@@ -359,8 +358,7 @@ object MetamathVisualizer {
             version,
             relPathToRoot,
             "MetamathAssertionView",
-//            compress(assertionDto),
-            assertionDto,
+            CompressionUtils.compress(assertionDto),
             File(dataDir, relPath.joinToString(separator = "/"))
         )
     }

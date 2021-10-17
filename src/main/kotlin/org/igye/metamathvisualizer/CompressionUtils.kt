@@ -1,6 +1,7 @@
 package org.igye.metamathvisualizer
 
 import org.igye.metamathvisualizer.dto.*
+import java.util.Comparator
 import java.util.function.Function
 import java.util.stream.Collectors
 
@@ -197,7 +198,8 @@ object CompressionUtils {
 
     private fun compressMapOfIntListToStr(map: Map<Int, List<Int>>): String {
         val sb = StringBuilder()
-        for ((key, value) in map) {
+        val sortedEntries = map.entries.sortedBy { entry -> entry.key }
+        for ((key, value) in sortedEntries) {
             sb.append(intToStr(key))
             sb.append(" ")
             sb.append(compressListOfIntsToStr(value))
@@ -278,8 +280,9 @@ object CompressionUtils {
     }
 
     private fun buildStrMap(counts: Map<String, Int>): Pair<List<String>, Map<String, Int>> {
+        val compareBy: Comparator<Map.Entry<String, Int>> = (compareBy<Map.Entry<String, Int>> { (_, value) -> value }).thenBy { (key, _) -> key }
         val strings = counts.entries.stream()
-            .sorted(compareByDescending { (_, value) -> value })
+            .sorted(compareBy.reversed())
             .map { (key, _) -> key }
             .collect(Collectors.toList())
         val strMap: MutableMap<String, Int> = HashMap()
