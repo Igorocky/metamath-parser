@@ -1,6 +1,9 @@
 package org.igye.metamathparser
 
 import org.igye.common.Utils.subList
+import java.util.*
+import kotlin.collections.ArrayList
+import kotlin.collections.HashMap
 
 class ProofStack {
     private var nodeCounter = 0;
@@ -10,11 +13,11 @@ class ProofStack {
 
     fun getLast() = stack.last()
 
-    fun put(constStmt: LabeledSequenceOfSymbols) {
-        if (constStmt.sequence.seqType != 'f' && constStmt.sequence.seqType != 'e') {
-            throw MetamathParserException("constStmt.seqType != 'f' && constStmt.seqType != 'e'")
+    fun put(constStmt: Statement) {
+        if (constStmt.type != 'f' && constStmt.type != 'e') {
+            throw MetamathParserException("constStmt.type != 'f' && constStmt.type != 'e'")
         }
-        put(StackNode(stmt = constStmt, value = constStmt.sequence.symbols))
+        put(StackNode(stmt = constStmt, value = constStmt.content))
     }
 
     fun apply(assertion: Assertion) {
@@ -22,18 +25,18 @@ class ProofStack {
             throw MetamathParserException("stack.size < assertion.hypotheses.size")
         }
         val baseStackIdx = stack.size - assertion.hypotheses.size
-        val substitution = HashMap<String,List<String>>()
+        val substitution = HashMap<Int,IntArray>()
         for (i in 0 until assertion.hypotheses.size) {
-            if (assertion.hypotheses[i].sequence.seqType == 'f') {
+            if (assertion.hypotheses[i].type == 'f') {
                 substitution.put(
-                    assertion.hypotheses[i].sequence.symbols[1],
-                    stack[baseStackIdx+i].value.drop(1)
+                    assertion.hypotheses[i].content[1],
+                    drop(1, stack[baseStackIdx+i].value)
                 )
             }
         }
         for (i in 0 until assertion.hypotheses.size) {
-            if (assertion.hypotheses[i].sequence.seqType == 'e') {
-                if (stack[baseStackIdx+i].value != applySubstitution(assertion.hypotheses[i].sequence.symbols, substitution)) {
+            if (assertion.hypotheses[i].type == 'e') {
+                if (!stack[baseStackIdx+i].value.contentEquals(applySubstitution(assertion.hypotheses[i].content, substitution))) {
                     throw MetamathParserException("stack.value != assertion.hypothesis")
                 }
             }
@@ -42,10 +45,18 @@ class ProofStack {
             args = subList(stack, baseStackIdx, stack.size),
             substitution = substitution,
             assertion = assertion,
-            value = applySubstitution(assertion.assertion.sequence.symbols, substitution)
+            value = applySubstitution(assertion.statement.content, substitution)
         )
         (0 until assertion.hypotheses.size).forEach { stack.removeAt(stack.size-1) }
         put(result)
+    }
+
+    private fun drop(n:Int, arr:IntArray):IntArray {
+        val res = IntArray(arr.size-n)
+        for (i in 0 until res.size) {
+            res[i] = arr[i+n]
+        }
+        return res
     }
 
     fun put(node: StackNode) {
@@ -55,15 +66,28 @@ class ProofStack {
         stack.add(node)
     }
 
-    private fun applySubstitution(value:List<String>, substitution: HashMap<String,List<String>>): List<String> {
-        val res = ArrayList<String>()
-        value.forEach {
-            val subSeq = substitution[it]
-            if (subSeq != null) {
-                res.addAll(subSeq)
+    fun applySubstitution(value:IntArray, substitution: Map<Int,IntArray>): IntArray {
+        var resultSize = 0
+        for (i in value) {
+            if (i < 0) {
+                resultSize++
             } else {
-                res.add(it)
+                resultSize += substitution[i]!!.size
             }
+        }
+        val res = IntArray(resultSize)
+        var s = 0
+        var t = 0
+        while (s < value.size) {
+            if (value[s] < 0) {
+                res[t] = value[s]
+                t++
+            } else {
+                val newExpr: IntArray = substitution[value[s]]!!
+                newExpr.copyInto(destination = res, destinationOffset = t)
+                t += newExpr.size
+            }
+            s++
         }
         return res
     }

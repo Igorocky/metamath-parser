@@ -45,9 +45,9 @@ internal class ProofVerifierTest {
 
         //when
         val verifiedTheorems = assertions.values.asSequence()
-            .filter { it.assertion.sequence.seqType == 'p' }
+            .filter { it.statement.type == 'p' }
             .filter { ProofVerifier.verifyProof(it) != null }
-            .map { it.assertion.label }
+            .map { it.statement.label }
             .toList()
 
         //then

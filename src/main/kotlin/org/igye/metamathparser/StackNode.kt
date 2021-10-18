@@ -1,6 +1,6 @@
 package org.igye.metamathparser
 
-open class StackNode(val stmt: LabeledSequenceOfSymbols? = null, val value: List<String>) {
+open class StackNode(val stmt: Statement? = null, val value: IntArray) {
     private var id = -1
 
     fun setId(id:Int) {

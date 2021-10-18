@@ -48,13 +48,13 @@ object Parsers {
             comments = comments,
             exprProc = exprProc
         )
-        for (assertion in ctx.getAssertions().values) {
-            for ((varName, varType) in assertion.visualizationData!!.variablesTypes) {
-                if (ctx.isConstant(varName) || !ctx.isConstant(varType)) {
-                    throw MetamathParserException("ctx.isConstant(varName) || !ctx.isConstant(varType)")
-                }
-            }
-        }
+//        for (assertion in ctx.getAssertions().values) {
+//            for ((varName, varType) in assertion.visualizationData!!.variablesTypes) {
+//                if (ctx.getNumberBySymbol(varName) < 0 || ctx.getNumberBySymbol(varType) > 0) {
+//                    throw MetamathParserException("ctx.isConstant(varName) || !ctx.isConstant(varType)")
+//                }
+//            }
+//        }
         return ctx
     }
 

@@ -96,7 +96,7 @@ object MetamathVisualizer {
                                 version, dto, dirToSaveTo, createRelPathToSaveTo(dto.name)
                             )
                         }
-                        indexElems[assertion.assertion.beginIdx] = createIndexElemDto(dto)
+                        indexElems[assertion.statement.beginIdx] = createIndexElemDto(dto)
                     } catch (e: Exception) {
                         println("Error - ${e.message}")
                         e.printStackTrace()
@@ -153,7 +153,7 @@ object MetamathVisualizer {
     fun visualizeAssertion(assertion: Assertion): AssertionDto {
         var proof: StackNode? = null
         var proofDto: List<StackNodeDto>? = null
-        if (assertion.assertion.sequence.seqType == 'p') {
+        if (assertion.statement.type == 'p') {
             proof = ProofVerifier.verifyProof(assertion)
             val nodes: MutableList<StackNodeDto> = ArrayList<StackNodeDto>()
             iterateNodes(proof) { node: StackNode ->
@@ -161,27 +161,27 @@ object MetamathVisualizer {
                     var nodeDto = StackNodeDto(
                         id = node.getId(),
                         args = node.args.map { it.getId() },
-                        type = node.assertion.assertion.sequence.seqType.uppercase(),
-                        label = node.assertion.assertion.label,
-                        params = node.assertion.hypotheses.map { it.sequence.symbols },
-                        numOfTypes = node.assertion.hypotheses.asSequence().filter { it.sequence.seqType == 'f' }
+                        type = node.assertion.statement.type.uppercase(),
+                        label = node.assertion.statement.label,
+                        params = node.assertion.hypotheses.map { it.content.map { assertion.innerNumToSymbol(it) } },
+                        numOfTypes = node.assertion.hypotheses.asSequence().filter { it.type == 'f' }
                             .count(),
-                        retVal = node.assertion.assertion.sequence.symbols,
-                        substitution = node.substitution,
-                        expr = node.value
+                        retVal = node.assertion.statement.content.map { assertion.innerNumToSymbol(it) },
+                        substitution = emptyMap(),
+                        expr = emptyList()
                     )
                     nodes.add(nodeDto)
                 } else {
                     nodes.add(StackNodeDto(
                         id = node.getId(),
                         args = null,
-                        type = node.stmt!!.sequence.seqType.uppercase(),
+                        type = node.stmt!!.type.uppercase(),
                         label = node.stmt!!.label,
                         params = null,
                         numOfTypes = 0,
                         retVal = null,
                         substitution = null,
-                        expr = node.stmt.sequence.symbols
+                        expr = emptyList()
                     ))
                 }
             }
@@ -190,14 +190,14 @@ object MetamathVisualizer {
             proofDto = uniqueSteps
         }
         val params: List<List<String>> = assertion.hypotheses.asSequence()
-            .filter { it.sequence.seqType == 'e' }
-            .map { it.sequence.symbols }
+            .filter { it.type == 'e' }
+            .map { it.content.map { assertion.innerNumToSymbol(it) } }
             .toList()
-        val retVal: List<String> = assertion.assertion.sequence.symbols
+        val retVal: List<String> = assertion.statement.content.map { assertion.innerNumToSymbol(it) }
         val allSymbols: Set<String> = extractAllSymbols(params, retVal, proofDto)
         var assertionDto = AssertionDto(
             type = getTypeStr(assertion),
-            name = assertion.assertion.label,
+            name = assertion.statement.label,
             description = assertion.description,
             varTypes = extractVariableTypes(assertion, proof, allSymbols),
             params = params,
@@ -362,11 +362,12 @@ object MetamathVisualizer {
     }
 
     private fun getTypeStr(type: Assertion): String {
-        return when(type.assertion.sequence.seqType) {
-            'a' -> "Axiom"
-            'p' -> "Theorem"
-            else -> type.assertion.sequence.seqType.toString()
-        }
+        return ""
+//        return when(type.statement.sequence.seqType) {
+//            'a' -> "Axiom"
+//            'p' -> "Theorem"
+//            else -> type.statement.sequence.seqType.toString()
+//        }
     }
 
     private fun createRelPathToSaveTo(label: String): List<String> {
@@ -387,13 +388,13 @@ object MetamathVisualizer {
     }
 
     private fun extractVariableTypes(assertion: Assertion, varTypes: MutableMap<String,String>, allSymbols: Set<String>) {
-        for ((varName, varType) in assertion.visualizationData!!.variablesTypes) {
-            if (allSymbols.contains(varName)) {
-                if (varTypes.containsKey(varName) && varTypes[varName] != varType) {
-                    throw MetamathParserException("varTypes.containsKey(varName) && varTypes[varName] != varType")
-                }
-                varTypes[varName] = varType
-            }
-        }
+//        for ((varName, varType) in assertion.visualizationData!!.variablesTypes) {
+//            if (allSymbols.contains(varName)) {
+//                if (varTypes.containsKey(varName) && varTypes[varName] != varType) {
+//                    throw MetamathParserException("varTypes.containsKey(varName) && varTypes[varName] != varType")
+//                }
+//                varTypes[varName] = varType
+//            }
+//        }
     }
 }

@@ -4,14 +4,14 @@ object ProofVerifier {
 
     fun verifyProof(theorem: Assertion): StackNode {
         val proofStack = ProofStack()
-        if (theorem.assertion.sequence.uncompressedProof != null) {
+        if (theorem.compressedProof != null) {
             eval(
+                compressedProof = theorem.compressedProof,
                 assertionsReferencedFromProof = theorem.assertionsReferencedFromProof,
                 proofStack = proofStack,
             )
         } else {
             eval(
-                compressedProof = theorem.assertion.sequence.compressedProof!!,
                 assertionsReferencedFromProof = theorem.assertionsReferencedFromProof,
                 proofStack = proofStack,
             )
@@ -20,15 +20,17 @@ object ProofVerifier {
             throw MetamathParserException("proofStack.size() != 1")
         }
         val result: StackNode = proofStack.getLast()
-        if (theorem.assertion.sequence.symbols != result.value) {
-            throw MetamathParserException("theorem.symbols != result.value")
+        if (!theorem.statement.content.contentEquals(result.value)) {
+            val expected = theorem.innerStatementToSymbols(theorem.statement)
+            val actual = theorem.innerStatementToSymbols(result.value)
+            throw MetamathParserException("!theorem.statement.content.contentEquals(result.value):\nexpected = $expected\nactual = $actual")
         }
         return result
     }
 
     private fun eval(assertionsReferencedFromProof:List<Any>, proofStack:ProofStack) {
         for (step in assertionsReferencedFromProof) {
-            if (step is LabeledSequenceOfSymbols) {
+            if (step is Statement) {
                 proofStack.put(step)
             } else {
                 proofStack.apply(step as Assertion)
@@ -37,12 +39,12 @@ object ProofVerifier {
     }
 
     private fun eval(
-        compressedProof:CompressedProof,
+        compressedProof:String,
         assertionsReferencedFromProof:List<Any>,
         proofStack:ProofStack,
     ) {
         val args = ArrayList<Any>(assertionsReferencedFromProof)
-        val proof: List<String> = splitEncodedProof(compressedProof.proof)
+        val proof: List<String> = splitEncodedProof(compressedProof)
 
         for (step in proof) {
             if ("Z".equals(step)) {
@@ -51,7 +53,7 @@ object ProofVerifier {
                 val arg = args[strToInt(step)-1]
                 if (arg is StackNode) {
                     proofStack.put(arg)
-                } else if (arg is LabeledSequenceOfSymbols) {
+                } else if (arg is Statement) {
                     proofStack.put(arg)
                 } else {
                     proofStack.apply(arg as Assertion)
