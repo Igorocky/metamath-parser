@@ -4,15 +4,15 @@ object ProofVerifier {
 
     fun verifyProof(theorem: Assertion): StackNode {
         val proofStack = ProofStack()
-        if (theorem.compressedProof != null) {
+        if (theorem.proofData.compressedProof != null) {
             eval(
-                compressedProof = theorem.compressedProof,
-                assertionsReferencedFromProof = theorem.assertionsReferencedFromProof,
+                compressedProof = theorem.proofData.compressedProof,
+                assertionsReferencedFromProof = theorem.proofData.assertionsReferencedFromProof,
                 proofStack = proofStack,
             )
         } else {
             eval(
-                assertionsReferencedFromProof = theorem.assertionsReferencedFromProof,
+                assertionsReferencedFromProof = theorem.proofData.assertionsReferencedFromProof,
                 proofStack = proofStack,
             )
         }
@@ -20,10 +20,15 @@ object ProofVerifier {
             throw MetamathParserException("proofStack.size() != 1")
         }
         val result: StackNode = proofStack.getLast()
-        if (!theorem.statement.content.contentEquals(result.value)) {
-            val expected = theorem.innerStatementToSymbols(theorem.statement)
-            val actual = theorem.innerStatementToSymbols(result.value)
-            throw MetamathParserException("!theorem.statement.content.contentEquals(result.value):\nexpected = $expected\nactual = $actual")
+        if (!theorem.proofData.statementToProve.content.contentEquals(result.value)) {
+            var expectedVsActual: String? = null
+            if (theorem.visualizationData != null) {
+                val expected = theorem.visualizationData.statementToSymbols(theorem.statement)
+                // TODO: 10/20/2021 it is not correct to apply theorem.visualizationData.statementToSymbols to result.value
+                val actual = theorem.visualizationData.statementToSymbols(result.value)
+                expectedVsActual = "expected = $expected\nactual = $actual"
+            }
+            throw MetamathParserException("!theorem.statement.content.contentEquals(result.value):\n$expectedVsActual")
         }
         return result
     }

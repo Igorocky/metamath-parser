@@ -7,10 +7,11 @@ internal class ProofStackTest {
     @Test
     fun applySubstitution_applies_substitution_correctly() {
         //given
-        val subs = mapOf(
-            1 to intArrayOf(10),
-            2 to intArrayOf(20,200),
-            3 to intArrayOf(30,300,3000),
+        val subs = listOf(
+            intArrayOf(10),
+            intArrayOf(10),
+            intArrayOf(20,200),
+            intArrayOf(30,300,3000),
         )
         val proofStack = ProofStack()
 

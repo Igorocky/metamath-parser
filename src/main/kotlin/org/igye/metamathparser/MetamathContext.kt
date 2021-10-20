@@ -7,10 +7,10 @@ class MetamathContext(
     private var rootContext:MetamathContext? = null
 
     private val constants:MutableList<String>? = if (parent == null) ArrayList() else null
-    private val constantSymbolToNumber:MutableMap<String,Int>? = if (parent == null) HashMap() else null
+    private val constantToNumber:MutableMap<String,Int>? = if (parent == null) HashMap() else null
 
     private var variables:MutableList<String>? = null
-    private var variableSymbolToNumber:MutableMap<String,Int>? = null
+    private var variableToNumber:MutableMap<String,Int>? = null
 
     private var hypotheses:MutableMap<String,Statement>? = null
     private val assertions:MutableMap<String,Assertion>? = if (parent == null) HashMap() else null
@@ -63,42 +63,46 @@ class MetamathContext(
             throw MetamathParserException("Constant declaration is allowed only in the outermost block.")
         }
         for (symbol in constants) {
-            if (getConstantSymbolNumber(symbol) != null || getVariableSymbolNumber(symbol) != null) {
+            if (getConstantNumber(symbol) != null || getVariableNumber(symbol) != null) {
                 throw MetamathParserException("Cannot redeclare symbol '$symbol'")
             }
             this.constants!!.add(symbol)
-            constantSymbolToNumber!![symbol] = -this.constants.size
+            constantToNumber!![symbol] = -this.constants.size
         }
     }
 
     fun addVariables(variables:Set<String>) {
         if (this.variables == null) {
             this.variables = ArrayList()
-            variableSymbolToNumber = HashMap()
+            variableToNumber = HashMap()
         }
         for (symbol in variables) {
-            if (getConstantSymbolNumber(symbol) != null || getVariableSymbolNumber(symbol) != null) {
+            if (getConstantNumber(symbol) != null || getVariableNumber(symbol) != null) {
                 throw MetamathParserException("Cannot redeclare symbol '$symbol'")
             }
+            variableToNumber!![symbol] = getNumberOfVariables()
             this.variables!!.add(symbol)
-            variableSymbolToNumber!![symbol] = getNumberOfVariables()
         }
     }
 
     fun getNumberBySymbol(symbol: String): Int =
-        getConstantSymbolNumber(symbol)?:getVariableSymbolNumber(symbol)
+        getConstantNumber(symbol)?:getVariableNumber(symbol)
             ?:throw MetamathParserException("Could not find symbol with name $symbol")
 
-    private fun getConstantSymbolNumber(symbol: String): Int? = getRootContext().constantSymbolToNumber?.get(symbol)
+    private fun getConstantNumber(symbol: String): Int? = getRootContext().constantToNumber?.get(symbol)
 
-    private fun getVariableSymbolNumber(symbol: String): Int? =
-        variableSymbolToNumber?.get(symbol)?:parent?.getVariableSymbolNumber(symbol)
+    private fun getVariableNumber(symbol: String): Int? = variableToNumber?.get(symbol)?:parent?.getVariableNumber(symbol)
 
     fun getSymbolByNumber(n:Int): String {
         if (n < 0) {
             return getRootContext().constants?.get(-n - 1) ?: throw MetamathParserException("A constant with number $n was not registered.")
         } else {
-            return variables?.get(n - 1) ?: parent?.getSymbolByNumber(n) ?: throw MetamathParserException("A variable with number $n was not registered.")
+            val varIdx = n - (parent?.getNumberOfVariables()?:0)
+            return if (0 <= varIdx && varIdx < variables!!.size) {
+                variables!![varIdx]
+            } else {
+                parent?.getSymbolByNumber(n) ?: throw MetamathParserException("A variable with number $n was not registered.")
+            }
         }
     }
 

@@ -163,10 +163,10 @@ object MetamathVisualizer {
                         args = node.args.map { it.getId() },
                         type = node.assertion.statement.type.uppercase(),
                         label = node.assertion.statement.label,
-                        params = node.assertion.hypotheses.map { it.content.map { assertion.innerNumToSymbol(it) } },
+                        params = emptyList()/*node.assertion.hypotheses.map { it.content.map { assertion.innerNumToSymbol(it) } }*/,
                         numOfTypes = node.assertion.hypotheses.asSequence().filter { it.type == 'f' }
                             .count(),
-                        retVal = node.assertion.statement.content.map { assertion.innerNumToSymbol(it) },
+                        retVal = emptyList()/*node.assertion.statement.content.map { assertion.innerNumToSymbol(it) }*/,
                         substitution = emptyMap(),
                         expr = emptyList()
                     )
@@ -189,16 +189,16 @@ object MetamathVisualizer {
             val uniqueSteps: List<StackNodeDto> = removeDuplicates(nodes)
             proofDto = uniqueSteps
         }
-        val params: List<List<String>> = assertion.hypotheses.asSequence()
+        val params: List<List<String>> = emptyList()/*assertion.hypotheses.asSequence()
             .filter { it.type == 'e' }
             .map { it.content.map { assertion.innerNumToSymbol(it) } }
-            .toList()
-        val retVal: List<String> = assertion.statement.content.map { assertion.innerNumToSymbol(it) }
+            .toList()*/
+        val retVal: List<String> = emptyList()/*assertion.statement.content.map { assertion.innerNumToSymbol(it) }*/
         val allSymbols: Set<String> = extractAllSymbols(params, retVal, proofDto)
         var assertionDto = AssertionDto(
             type = getTypeStr(assertion),
             name = assertion.statement.label,
-            description = assertion.description,
+            description = assertion.visualizationData!!.description,
             varTypes = extractVariableTypes(assertion, proof, allSymbols),
             params = params,
             retVal = retVal,

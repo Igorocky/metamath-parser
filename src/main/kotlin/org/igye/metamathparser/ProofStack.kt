@@ -1,9 +1,6 @@
 package org.igye.metamathparser
 
 import org.igye.common.Utils.subList
-import java.util.*
-import kotlin.collections.ArrayList
-import kotlin.collections.HashMap
 
 class ProofStack {
     private var nodeCounter = 0;
@@ -25,13 +22,11 @@ class ProofStack {
             throw MetamathParserException("stack.size < assertion.hypotheses.size")
         }
         val baseStackIdx = stack.size - assertion.hypotheses.size
-        val substitution = HashMap<Int,IntArray>()
+        val substitution = ArrayList<IntArray>(assertion.numberOfPlaceholders)
         for (i in 0 until assertion.hypotheses.size) {
-            if (assertion.hypotheses[i].type == 'f') {
-                substitution.put(
-                    assertion.hypotheses[i].content[1],
-                    drop(1, stack[baseStackIdx+i].value)
-                )
+            val hypothesis = assertion.hypotheses[i]
+            if (hypothesis.type == 'f') {
+                substitution.add(drop(1, stack[baseStackIdx+i].value))
             }
         }
         for (i in 0 until assertion.hypotheses.size) {
@@ -66,13 +61,13 @@ class ProofStack {
         stack.add(node)
     }
 
-    fun applySubstitution(value:IntArray, substitution: Map<Int,IntArray>): IntArray {
+    fun applySubstitution(value:IntArray, substitution: List<IntArray>): IntArray {
         var resultSize = 0
         for (i in value) {
             if (i < 0) {
                 resultSize++
             } else {
-                resultSize += substitution[i]!!.size
+                resultSize += substitution[i].size
             }
         }
         val res = IntArray(resultSize)
@@ -83,7 +78,7 @@ class ProofStack {
                 res[t] = value[s]
                 t++
             } else {
-                val newExpr: IntArray = substitution[value[s]]!!
+                val newExpr: IntArray = substitution[value[s]]
                 newExpr.copyInto(destination = res, destinationOffset = t)
                 t += newExpr.size
             }
