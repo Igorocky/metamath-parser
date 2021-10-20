@@ -3,6 +3,7 @@ package org.igye.metamathparser
 import org.igye.common.Utils
 import org.junit.Assert
 import org.junit.Test
+import java.io.File
 import java.util.*
 
 internal class ProofVerifierTest {
@@ -42,6 +43,7 @@ internal class ProofVerifierTest {
         //given
         val assertions: Map<String, Assertion> =
             Parsers.parseMetamathFile(text = Utils.readStringFromClassPath("/set-reduced.mm"), ExpressionProcessor).getAssertions()
+//            Parsers.parseMetamathFile(text = File("C:\\igye\\books\\metamath/set.mm").readText(), ExpressionProcessor).getAssertions()
 
         //when
         val verifiedTheorems = assertions.values.asSequence()

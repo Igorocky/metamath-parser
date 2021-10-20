@@ -107,7 +107,7 @@ class MetamathContext(
     }
 
     private fun getNumberOfVariables(): Int {
-        return variables?.size?:0 + (parent?.getNumberOfVariables()?:0)
+        return (variables?.size?:0) + (parent?.getNumberOfVariables()?:0)
     }
 
     // TODO: 10/18/2021 get name from stmt.label

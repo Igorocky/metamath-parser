@@ -117,7 +117,7 @@ object ExpressionProcessor: ((MetamathContext,Expression) -> Unit) {
         contextVarToAssertionVar: Map<Int,Int>,
         numberOfLocalVariables: Int
     ):Map<Int,String> {
-        return symbolsMap.mapKeys { if (it.key < 0 || it.key >= numberOfLocalVariables) it.key else contextVarToAssertionVar[it.key]!! }
+        return symbolsMap.mapKeys { contextVarToAssertionVar[it.key]?:it.key }
     }
 
     private fun renumberVariables(statement: Statement, contextVarToAssertionVar: HashMap<Int,Int>):Statement {
