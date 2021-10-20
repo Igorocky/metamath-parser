@@ -2,6 +2,7 @@ package org.igye.metamathparser
 
 data class VisualizationData(
     val description: String,
+    val assertionVarToContextVar: IntArray,
     val symbolsMap: Map<Int,String>,
     val variablesTypes: Map<String,String>,
 ) {
@@ -11,3 +12,10 @@ data class VisualizationData(
 
     fun numToSymbol(n:Int): String = symbolsMap[n]!!
 }
+
+val emptyVisualizationData = VisualizationData(
+    description = "",
+    assertionVarToContextVar = IntArray(0),
+    symbolsMap = emptyMap(),
+    variablesTypes = emptyMap()
+)

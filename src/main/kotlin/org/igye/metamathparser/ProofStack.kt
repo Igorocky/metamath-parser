@@ -22,7 +22,7 @@ class ProofStack {
             throw MetamathParserException("stack.size < assertion.hypotheses.size")
         }
         val baseStackIdx = stack.size - assertion.hypotheses.size
-        val substitution = ArrayList<IntArray>(assertion.numberOfPlaceholders)
+        val substitution = ArrayList<IntArray>(assertion.numberOfVariables)
         for (i in 0 until assertion.hypotheses.size) {
             val hypothesis = assertion.hypotheses[i]
             if (hypothesis.type == 'f') {

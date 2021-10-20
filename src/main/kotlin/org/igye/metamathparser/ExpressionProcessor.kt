@@ -95,56 +95,38 @@ object ExpressionProcessor: ((MetamathContext,Expression) -> Unit) {
             compressedProof = expr.sequence.compressedProof,
         )
         addVarTypes(variablesTypes, assertionsReferencedFromProof)
-        return renumberVariables(Assertion(
-            hypotheses = mandatoryHypotheses,
-            statement = assertionStatement,
-            proofData = ProofData(
-                statementToProve = assertionStatement,
-                compressedProof = expr.sequence.compressedProof?.proof,
-                assertionsReferencedFromProof = assertionsReferencedFromProof,
-            ),
-            numberOfPlaceholders = variables.size,
-            visualizationData = VisualizationData(
-                description = ctx.lastComment?.trim()?:"",
-                variablesTypes = variablesTypes.asSequence().associate { ctx.getSymbolByNumber(it.key) to ctx.getSymbolByNumber(it.value) },
-                symbolsMap = createNumToSymbolMap(mandatoryHypotheses, assertionStatement, assertionsReferencedFromProof, ctx)
-            )
-        ))
-    }
 
-    private fun renumberVariables(
-        symbolsMap: Map<Int,String>,
-        contextVarToAssertionVar: Map<Int,Int>,
-        numberOfLocalVariables: Int
-    ):Map<Int,String> {
-        return symbolsMap.mapKeys { contextVarToAssertionVar[it.key]?:it.key }
-    }
-
-    private fun renumberVariables(statement: Statement, contextVarToAssertionVar: HashMap<Int,Int>):Statement {
-        return statement.copy(content = renumberVariables(statement.content, contextVarToAssertionVar))
-    }
-    private fun renumberVariables(assertion: Assertion):Assertion {
-        val assertionVarToContextVar = IntArray(assertion.numberOfPlaceholders)
+        val assertionVarToContextVar = IntArray(variables.size)
         val contextVarToAssertionVar = HashMap<Int,Int>()
         var assertionVarNum = 0
-        for (hypothesis in assertion.hypotheses) {
+        for (hypothesis in mandatoryHypotheses) {
             if (hypothesis.type == 'f') {
                 assertionVarToContextVar[assertionVarNum] = hypothesis.content[1]
                 contextVarToAssertionVar[hypothesis.content[1]] = assertionVarNum
                 assertionVarNum++
             }
         }
-        return assertion.copy(
-            hypotheses = assertion.hypotheses.map { renumberVariables(it, contextVarToAssertionVar) },
-            statement = renumberVariables(assertion.statement, contextVarToAssertionVar),
-            visualizationData = assertion.visualizationData?.copy(
-                symbolsMap = renumberVariables(
-                    symbolsMap = assertion.visualizationData.symbolsMap,
-                    contextVarToAssertionVar = contextVarToAssertionVar,
-                    numberOfLocalVariables = assertion.numberOfPlaceholders
-                )
+
+        return Assertion(
+            hypotheses = mandatoryHypotheses.map { renumberVariables(it, contextVarToAssertionVar) },
+            statement = renumberVariables(assertionStatement, contextVarToAssertionVar),
+            proofData = ProofData(
+                statementToProve = assertionStatement,
+                compressedProof = expr.sequence.compressedProof?.proof,
+                assertionsReferencedFromProof = assertionsReferencedFromProof,
+            ),
+            numberOfVariables = variables.size,
+            visualizationData = VisualizationData(
+                description = ctx.lastComment?.trim()?:"",
+                assertionVarToContextVar = assertionVarToContextVar,
+                variablesTypes = variablesTypes.asSequence().associate { ctx.getSymbolByNumber(it.key) to ctx.getSymbolByNumber(it.value) },
+                symbolsMap = createNumToSymbolMap(mandatoryHypotheses, assertionStatement, assertionsReferencedFromProof, ctx)
             )
         )
+    }
+
+    private fun renumberVariables(statement: Statement, contextVarToAssertionVar: HashMap<Int,Int>):Statement {
+        return statement.copy(content = renumberVariables(statement.content, contextVarToAssertionVar))
     }
 
     private fun createNumToSymbolMap(
@@ -165,20 +147,6 @@ object ExpressionProcessor: ((MetamathContext,Expression) -> Unit) {
             }
         }
         return allNums.associate { it to ctx.getSymbolByNumber(it) }
-    }
-
-    fun createContentInner(content: IntArray, contextVarToAssertionVar: Map<Int,Int>, allNums: MutableSet<Int>): IntArray {
-        val contentInner = IntArray(content.size)
-        for (i in 0 until content.size) {
-            val num = content[i]
-            allNums.add(num)
-            if (num < 0) {
-                contentInner[i] = num
-            } else {
-                contentInner[i] = contextVarToAssertionVar[num]!!
-            }
-        }
-        return contentInner
     }
 
     private fun renumberVariables(stmt: IntArray, contextVarToAssertionVar: Map<Int,Int>): IntArray {
