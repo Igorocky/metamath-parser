@@ -21,6 +21,7 @@ import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicReference
 import java.util.function.Function
 import java.util.stream.Collectors
+import kotlin.collections.HashMap
 
 fun main() {
     val assertions: Map<String, Assertion> = DebugTimer.run("parseMetamathFile") {
@@ -153,22 +154,28 @@ object MetamathVisualizer {
     fun visualizeAssertion(assertion: Assertion): AssertionDto {
         var proof: StackNode? = null
         var proofDto: List<StackNodeDto>? = null
+        var symbolsInfo: SymbolsInfo?
         if (assertion.statement.type == 'p') {
             proof = ProofVerifier.verifyProof(assertion)
+            symbolsInfo = collectSymbolsInfo(assertion, proof)
+            val globalScope = symbolsInfo
             val nodes: MutableList<StackNodeDto> = ArrayList<StackNodeDto>()
             iterateNodes(proof) { node: StackNode ->
                 if (node is CalculatedStackNode) {
+                    val localScope = collectSymbolsInfo(node.assertion, null)
+                    val localVarToGlobalVar = node.assertion.visualizationData.localVarToGlobalVar
                     var nodeDto = StackNodeDto(
                         id = node.getId(),
                         args = node.args.map { it.getId() },
                         type = node.assertion.statement.type.uppercase(),
                         label = node.assertion.statement.label,
-                        params = emptyList()/*node.assertion.hypotheses.map { it.content.map { assertion.innerNumToSymbol(it) } }*/,
-                        numOfTypes = node.assertion.hypotheses.asSequence().filter { it.type == 'f' }
-                            .count(),
-                        retVal = emptyList()/*node.assertion.statement.content.map { assertion.innerNumToSymbol(it) }*/,
-                        substitution = emptyMap(),
-                        expr = emptyList()
+                        params = node.assertion.hypotheses.map {
+                            toSymbols(it.content, globalScope.constants, localScope.variables, localVarToGlobalVar)
+                        },
+                        numOfTypes = node.assertion.numberOfVariables,
+                        retVal = toSymbols(node.assertion.statement.content, globalScope.constants, localScope.variables, localVarToGlobalVar),
+                        substitution = toSymbols(node.substitution, globalScope.constants, globalScope.variables, localScope.variables, localVarToGlobalVar),
+                        expr = toSymbols(node.value, globalScope.constants, globalScope.variables, null)
                     )
                     nodes.add(nodeDto)
                 } else {
@@ -176,30 +183,32 @@ object MetamathVisualizer {
                         id = node.getId(),
                         args = null,
                         type = node.stmt!!.type.uppercase(),
-                        label = node.stmt!!.label,
+                        label = node.stmt.label,
                         params = null,
                         numOfTypes = 0,
                         retVal = null,
                         substitution = null,
-                        expr = emptyList()
+                        expr = toSymbols(node.value, globalScope.constants, globalScope.variables, null)
                     ))
                 }
             }
             Collections.sort(nodes, Comparator.comparing { it.id })
             val uniqueSteps: List<StackNodeDto> = removeDuplicates(nodes)
             proofDto = uniqueSteps
+        } else {
+            symbolsInfo = collectSymbolsInfo(assertion, null)
         }
-        val params: List<List<String>> = emptyList()/*assertion.hypotheses.asSequence()
+        val params: List<List<String>> = assertion.hypotheses.asSequence()
             .filter { it.type == 'e' }
-            .map { it.content.map { assertion.innerNumToSymbol(it) } }
-            .toList()*/
-        val retVal: List<String> = emptyList()/*assertion.statement.content.map { assertion.innerNumToSymbol(it) }*/
+            .map { toSymbols(it.content, symbolsInfo.constants, symbolsInfo.variables, assertion.visualizationData.localVarToGlobalVar) }
+            .toList()
+        val retVal: List<String> = toSymbols(assertion.statement.content, symbolsInfo.constants, symbolsInfo.variables, assertion.visualizationData.localVarToGlobalVar)
         val allSymbols: Set<String> = extractAllSymbols(params, retVal, proofDto)
         var assertionDto = AssertionDto(
             type = getTypeStr(assertion),
             name = assertion.statement.label,
-            description = assertion.visualizationData!!.description,
-            varTypes = extractVariableTypes(assertion, proof, allSymbols),
+            description = assertion.visualizationData.description,
+            varTypes = symbolsInfo.varTypes.filter { (k,v) -> allSymbols.contains(k) },
             params = params,
             retVal = retVal,
             proof = proofDto
@@ -227,6 +236,28 @@ object MetamathVisualizer {
             }
         }
         return allSymbols
+    }
+
+    private fun toSymbols(statement: IntArray, constants:Map<Int,String>, vars:Map<Int,String>, remapVariables:IntArray?): List<String> {
+        return statement.map {
+            if (it < 0) constants[it]!!
+            else if (remapVariables == null) vars[it]!!
+            else vars[remapVariables[it]]!!
+        }
+    }
+
+    private fun toSymbols(
+        substitution: List<IntArray>,
+        constants:Map<Int,String>,
+        globalVars:Map<Int,String>,
+        localVars:Map<Int,String>,
+        remapVariables:IntArray
+    ): Map<String, List<String>> {
+        val result = HashMap<String, List<String>>()
+        for (i in 0 until substitution.size) {
+            result[localVars[remapVariables[i]]!!] = toSymbols(substitution[i], constants, globalVars, null)
+        }
+        return result
     }
 
     private fun removeDuplicates(nodes: List<StackNodeDto>): List<StackNodeDto> {
@@ -362,39 +393,53 @@ object MetamathVisualizer {
     }
 
     private fun getTypeStr(type: Assertion): String {
-        return ""
-//        return when(type.statement.sequence.seqType) {
-//            'a' -> "Axiom"
-//            'p' -> "Theorem"
-//            else -> type.statement.sequence.seqType.toString()
-//        }
+        return when(type.statement.type) {
+            'a' -> "Axiom"
+            'p' -> "Theorem"
+            else -> type.statement.type.toString()
+        }
     }
 
     private fun createRelPathToSaveTo(label: String): List<String> {
         return listOf("asrt", "$label.html")
     }
 
-    private fun extractVariableTypes(assertion: Assertion, proof: StackNode?, allSymbols: Set<String>): Map<String, String> {
-        val varTypes = HashMap<String,String>()
-        extractVariableTypes(assertion, varTypes, allSymbols)
+    private fun splitConstantsAndVars(symbolsMap: Map<Int,String>): Pair<MutableMap<Int,String>,MutableMap<Int,String>> {
+        val constants = HashMap<Int, String>()
+        val variables = HashMap<Int, String>()
+        symbolsMap.asSequence().forEach {(k,v) ->
+            putIfNoConflicts(if (k < 0) constants else variables, k, v)
+        }
+        return Pair(constants, variables)
+    }
+
+    private fun collectSymbolsInfo(assertion: Assertion, proof: StackNode?): SymbolsInfo {
+        val (constants, variables) = splitConstantsAndVars(assertion.visualizationData.symbolsMap)
+        val varTypes = HashMap<String,String>(assertion.visualizationData.variablesTypes)
+
         if (proof != null) {
-            iterateNodes(proof) {
-                if (it is CalculatedStackNode) {
-                    extractVariableTypes(it.assertion, varTypes, allSymbols)
+            iterateNodes(proof) { node->
+                if (node is CalculatedStackNode) {
+                    node.assertion.visualizationData.symbolsMap.forEach {(k,v) ->
+                        if (k < 0) {
+                            putIfNoConflicts(constants, k, v)
+                        }
+                    }
+                    node.assertion.visualizationData.variablesTypes.forEach {(k,v) ->
+                        putIfNoConflicts(varTypes, k, v)
+                    }
                 }
             }
         }
-        return varTypes
+        return SymbolsInfo(constants, variables, varTypes)
     }
 
-    private fun extractVariableTypes(assertion: Assertion, varTypes: MutableMap<String,String>, allSymbols: Set<String>) {
-//        for ((varName, varType) in assertion.visualizationData!!.variablesTypes) {
-//            if (allSymbols.contains(varName)) {
-//                if (varTypes.containsKey(varName) && varTypes[varName] != varType) {
-//                    throw MetamathParserException("varTypes.containsKey(varName) && varTypes[varName] != varType")
-//                }
-//                varTypes[varName] = varType
-//            }
-//        }
+    private fun <K,V> putIfNoConflicts(map:MutableMap<K,V>, k:K, v:V) {
+        val existingV = map[k]
+        if (existingV == null) {
+            map[k] = v
+        } else if (existingV != v) {
+            throw MetamathParserException("existingV != v")
+        }
     }
 }

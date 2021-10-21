@@ -2,7 +2,7 @@ package org.igye.metamathparser
 
 data class VisualizationData(
     val description: String,
-    val assertionVarToContextVar: IntArray,
+    val localVarToGlobalVar: IntArray,
     val symbolsMap: Map<Int,String>,
     val variablesTypes: Map<String,String>,
 ) {
@@ -15,7 +15,7 @@ data class VisualizationData(
 
 val emptyVisualizationData = VisualizationData(
     description = "",
-    assertionVarToContextVar = IntArray(0),
+    localVarToGlobalVar = IntArray(0),
     symbolsMap = emptyMap(),
     variablesTypes = emptyMap()
 )

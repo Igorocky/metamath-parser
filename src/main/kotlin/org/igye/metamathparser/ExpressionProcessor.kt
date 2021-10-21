@@ -118,7 +118,7 @@ object ExpressionProcessor: ((MetamathContext,Expression) -> Unit) {
             numberOfVariables = variables.size,
             visualizationData = VisualizationData(
                 description = ctx.lastComment?.trim()?:"",
-                assertionVarToContextVar = assertionVarToContextVar,
+                localVarToGlobalVar = assertionVarToContextVar,
                 variablesTypes = variablesTypes.asSequence().associate { ctx.getSymbolByNumber(it.key) to ctx.getSymbolByNumber(it.value) },
                 symbolsMap = createNumToSymbolMap(mandatoryHypotheses, assertionStatement, assertionsReferencedFromProof, ctx)
             )

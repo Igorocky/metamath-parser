@@ -48,13 +48,6 @@ object Parsers {
             comments = comments,
             exprProc = exprProc
         )
-        for (assertion in ctx.getAssertions().values) {
-            for ((varName, varType) in assertion.visualizationData!!.variablesTypes) {
-                if (ctx.getNumberBySymbol(varName) < 0 || ctx.getNumberBySymbol(varType) >= 0) {
-                    throw MetamathParserException("ctx.isConstant(varName) || ctx.isVariable(varType)")
-                }
-            }
-        }
         return ctx
     }
 
