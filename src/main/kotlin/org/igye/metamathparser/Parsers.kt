@@ -31,7 +31,7 @@ data class LabeledSequenceOfSymbols(val label:String, val sequence:SequenceOfSym
 
 object Parsers {
 
-    fun parseMetamathFile(text:String, exprProc: (MetamathContext, Expression) -> Unit):MetamathContext {
+    fun <C:MetamathContextI<C>> parseMetamathFile(text:String, rootContext: C, exprProc: (C, Expression) -> Unit):C {
         val (_, code: List<NonComment>) = extractComments(text)
         val comments = ArrayList<Comment>()
         val sb = StringBuilder()
@@ -41,21 +41,20 @@ object Parsers {
             }
             sb.append(" ").append(nonComment.text)
         }
-        val ctx = MetamathContext()
         parseBlock(
             inp = ParserInput(text = sb.toString(), begin = 0),
-            context = ctx,
+            context = rootContext,
             comments = comments,
             exprProc = exprProc
         )
-        return ctx
+        return rootContext
     }
 
-    private fun parseBlock(
+    private fun <C:MetamathContextI<C>> parseBlock(
         inp:ParserInput,
-        context:MetamathContext,
+        context:C,
         comments: List<Comment>,
-        exprProc: (MetamathContext,Expression) -> Unit
+        exprProc: (C,Expression) -> Unit
     ):ParserOutput<Unit> {
         var idx = inp.begin
         val text = inp.text
@@ -87,7 +86,7 @@ object Parsers {
                     }
                 } else {
                     val sequenceOfSymbols = parseLabeledSequenceOfSymbols(inp.proceedTo(idx))
-                    context.lastComment = findLastCommentInBetween(comments, inp.begin, idx)
+                    context.setLastComment(findLastCommentInBetween(comments, inp.begin, idx))
                     exprProc(context, sequenceOfSymbols.result)
                     idx = sequenceOfSymbols.end+1
                 }

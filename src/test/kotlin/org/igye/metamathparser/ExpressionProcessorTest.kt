@@ -10,7 +10,9 @@ internal class ExpressionProcessorTest {
     fun successfully_processes_metamath_file_with_noncompressed_proofs() {
         //when
         val assertions: Map<String, Assertion> =
-            Parsers.parseMetamathFile(text = Utils.readStringFromClassPath("/demo0.mm"), ExpressionProcessor).getAssertions()
+            Parsers.parseMetamathFile(
+                text = Utils.readStringFromClassPath("/demo0.mm"), rootContext = MetamathContext(), exprProc = ExpressionProcessor
+            ).getAssertions()
 
         //then
         assertEquals(setOf("tze","tpl","weq","wim","a1","a2","mp","th1","th2"), assertions.keys)
@@ -20,7 +22,9 @@ internal class ExpressionProcessorTest {
     fun successfully_processes_metamath_file_with_compressed_proofs() {
         //when
         val assertions: Map<String, Assertion> =
-            Parsers.parseMetamathFile(text = Utils.readStringFromClassPath("/set-reduced.mm"), ExpressionProcessor).getAssertions()
+            Parsers.parseMetamathFile(
+                text = Utils.readStringFromClassPath("/set-reduced.mm"), rootContext = MetamathContext(), exprProc = ExpressionProcessor
+            ).getAssertions()
 
         //then
         assertEquals(193, assertions.size)

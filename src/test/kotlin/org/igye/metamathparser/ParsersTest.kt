@@ -128,7 +128,7 @@ internal class ParsersTest {
         val expressins = ArrayList<List<String>>()
 
         //when
-        Parsers.parseMetamathFile(text = Utils.readStringFromClassPath("/demo0.mm")) { ctx, expr ->
+        Parsers.parseMetamathFile(text = Utils.readStringFromClassPath("/demo0.mm"), rootContext = MetamathContext()) { ctx, expr ->
             expressins.add(
                 when (expr) {
                     is SequenceOfSymbols -> expr.symbols

@@ -28,7 +28,8 @@ fun main() {
         Parsers.parseMetamathFile(
             text = File("C:\\igye\\books\\metamath\\set.mm").readText(),
 //            text = File("C:\\igye\\projects\\kotlin\\metamath-parser\\src\\test\\resources\\set-reduced.mm").readText(),
-            ExpressionProcessor
+            rootContext = MetamathContext(),
+            exprProc = ExpressionProcessor
         ).getAssertions()
     }
     DebugTimer.run("generateProofExplorer") {

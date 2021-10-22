@@ -2,8 +2,7 @@ package org.igye.metamathparser
 
 class MetamathContext(
     private val parent:MetamathContext? = null,
-    var lastComment: String? = null
-) {
+):MetamathContextI<MetamathContext> {
     private var rootContext:MetamathContext? = null
 
     private val constants:MutableList<String>? = if (parent == null) ArrayList() else null
@@ -15,7 +14,9 @@ class MetamathContext(
     private var hypotheses:MutableMap<String,Statement>? = null
     private val assertions:MutableMap<String,Assertion>? = if (parent == null) HashMap() else null
 
-    fun createChildContext(): MetamathContext {
+    private var lastCommentP: String? = null
+
+    override fun createChildContext(): MetamathContext {
         return MetamathContext(parent = this)
     }
 
@@ -120,5 +121,11 @@ class MetamathContext(
 
     fun addAssertion(name:String, expr:Assertion) {
         getAssertions()[name] = expr
+    }
+
+    fun getLastComment() = lastCommentP
+
+    override fun setLastComment(str: String?) {
+        lastCommentP = str
     }
 }
