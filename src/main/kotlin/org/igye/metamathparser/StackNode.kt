@@ -1,6 +1,6 @@
 package org.igye.metamathparser
 
-open class StackNode(val stmt: Statement? = null, val value: IntArray) {
+abstract class StackNode(val value: IntArray) {
     private var id = -1
 
     fun setId(id:Int) {
@@ -11,8 +11,4 @@ open class StackNode(val stmt: Statement? = null, val value: IntArray) {
     }
 
     fun getId() = id
-
-    override fun toString(): String {
-        return "Const: ${value.joinToString(separator = " ")}"
-    }
 }

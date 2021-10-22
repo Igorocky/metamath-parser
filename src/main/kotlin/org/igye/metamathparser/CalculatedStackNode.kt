@@ -7,6 +7,6 @@ class CalculatedStackNode(
     value: IntArray
 ):StackNode(value = value) {
     override fun toString(): String {
-        return "Calculated: ${value.joinToString(separator = " ")}"
+        return "Calculated node: ${value.joinToString(separator = " ")}"
     }
 }

@@ -14,7 +14,7 @@ class ProofStack {
         if (constStmt.type != 'f' && constStmt.type != 'e') {
             throw MetamathParserException("constStmt.type != 'f' && constStmt.type != 'e'")
         }
-        put(StackNode(stmt = constStmt, value = constStmt.content))
+        put(ConstStackNode(stmt = constStmt))
     }
 
     fun apply(assertion: Assertion) {

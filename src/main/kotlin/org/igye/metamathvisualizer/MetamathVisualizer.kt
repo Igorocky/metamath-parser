@@ -179,11 +179,11 @@ object MetamathVisualizer {
                         expr = toSymbols(node.value, globalScope.constants, globalScope.variables, null)
                     )
                     nodes.add(nodeDto)
-                } else {
+                } else if (node is ConstStackNode) {
                     nodes.add(StackNodeDto(
                         id = node.getId(),
                         args = null,
-                        type = node.stmt!!.type.uppercase(),
+                        type = node.stmt.type.uppercase(),
                         label = node.stmt.label,
                         params = null,
                         numOfTypes = 0,

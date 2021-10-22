@@ -21,14 +21,7 @@ object ProofVerifier {
         }
         val result: StackNode = proofStack.getLast()
         if (!theorem.proofData.statementToProve.content.contentEquals(result.value)) {
-            var expectedVsActual: String? = null
-            if (theorem.visualizationData != null) {
-                val expected = theorem.visualizationData.statementToSymbols(theorem.statement)
-                // TODO: 10/20/2021 it is not correct to apply theorem.visualizationData.statementToSymbols to result.value
-                val actual = theorem.visualizationData.statementToSymbols(result.value)
-                expectedVsActual = "expected = $expected\nactual = $actual"
-            }
-            throw MetamathParserException("!theorem.statement.content.contentEquals(result.value):\n$expectedVsActual")
+            throw MetamathParserException("!theorem.statement.content.contentEquals(result.value)")
         }
         return result
     }
