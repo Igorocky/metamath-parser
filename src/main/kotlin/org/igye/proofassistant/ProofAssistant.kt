@@ -13,6 +13,7 @@ object ProofAssistant {
             throw MetamathParserException("!allowedStatementsTypes.contains(stmtToProve.content[0])")
         }
 
+        return ConstStackNode(Statement(type = 'n',content = intArrayOf()))
     }
 
     private fun findPossibleSubstitutions(stmt: IntArray, assertion: Assertion): List<IntArray> {
@@ -66,6 +67,8 @@ object ProofAssistant {
                 }
             }
         }
+
+        return emptyList()
     }
 
     private fun findPossibleSubstitutions(
@@ -75,38 +78,37 @@ object ProofAssistant {
         constParts: ArrayList<IntArray>,
         matchingConstParts: ArrayList<IntArray>,
     ): List<IntArray> {
-        val varGroups:MutableList<Triple<IntArray,IntArray, IntArray>> = ArrayList()
+        val varGroups:MutableList<Triple<IntArray,IntArray,IntArray>> = ArrayList()
         for (i in 0 until constParts.size) {
             if (i == 0 && constParts[0][0] != 0) {
                 val vars = intArrayOf(0, constParts[0][0] - 1)
-                varGroups.add(
-                    Triple(
+                varGroups.add(Triple(
                     vars,
                     intArrayOf(0,matchingConstParts[0][0]-1),
-                    IntArray(vars[1]-vars[0]+1,{-1})
-                )
-                )
+                    IntArray(vars[1]-vars[0]+1) { -1 }
+                ))
             }
             if (i == constParts.size-1 && constParts.last()[1] != asrtStmt.size-1) {
                 val vars = intArrayOf(constParts.last()[1] + 1, asrtStmt.size - 1)
                 varGroups.add(Triple(
                     vars,
                     intArrayOf(matchingConstParts.last()[1]+1, stmt.size-1),
-                    IntArray(vars[1]-vars[0]+1,{-1})
+                    IntArray(vars[1]-vars[0]+1) { -1 }
                 ))
             }
             if (i < constParts.size-1) {
-                varGroups.add(
-                    Triple(
-                    intArrayOf(constParts[i][1]+1, constParts[i+1][0]-1),
-                    intArrayOf(matchingConstParts[i][1]+1, matchingConstParts[i+1][0]-1)
-                )
-                )
+//                varGroups.add(
+//                    Triple(
+//                    intArrayOf(constParts[i][1]+1, constParts[i+1][0]-1),
+//                    intArrayOf(matchingConstParts[i][1]+1, matchingConstParts[i+1][0]-1)
+//                )
+//                )
             }
         }
 
-        fun nextVarGroupState(subs:Array<IntArray>, grp:Pair<IntArray,IntArray>, state:)
+//        fun nextVarGroupState(subs:Array<IntArray>, grp:Pair<IntArray,IntArray>, state:)
 
+        return emptyList()
     }
 
     private fun findFirstSubSeq(where:IntArray, startIdx:Int, what:IntArray, begin:Int, end:Int): IntArray? {
