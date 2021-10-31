@@ -202,7 +202,7 @@ internal class ProofAssistantTest {
         var cnt = 0
         val expectedConstParts = "[[1,1]]"
         val expectedMatchingConstParts = setOf(
-            "[[5,5]]",
+            "[[5,5]]" ,
         )
 
         //when
