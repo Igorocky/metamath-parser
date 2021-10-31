@@ -16,6 +16,77 @@ object ProofAssistant {
         return ConstStackNode(Statement(type = 'n',content = intArrayOf()))
     }
 
+    fun iterateMatchingConstParts(
+        stmt: IntArray,
+        assertion: Assertion,
+        consumer: (constParts: ArrayList<IntArray>, matchingConstParts: List<IntArray>) -> Unit
+    ) {
+
+    }
+
+    fun nextMatchingConstParts(
+        stmt: IntArray,
+        asrtStmt: IntArray,
+        constParts: ArrayList<IntArray>,
+        matchingConstParts: Array<IntArray>
+    ): Boolean {
+        var p = matchingConstParts.size-1
+        while (p >= 0) {
+            val nextMatch = findFirstSubSeq(
+                where = stmt, startIdx = matchingConstParts[p][0]+1,
+                what = asrtStmt, begin = constParts[p][0], end = constParts[p][1]
+            )
+            if (nextMatch != null) {
+                matchingConstParts[p] = nextMatch
+                if (p < matchingConstParts.size-1) {
+                    val allRemainingPartsFound = findMatchingConstParts(
+                        firstConstPartIdx = p+1,
+                        constParts = constParts,
+                        matchingConstParts = matchingConstParts,
+                        stmt = stmt,
+                        asrtStmt = asrtStmt
+                    )
+                    if (!allRemainingPartsFound) {
+                        p--
+                        continue
+                    }
+                }
+            }
+            p--
+        }
+        return p >= 0
+    }
+
+    private fun lengthOfGap(leftConstPartIdx:Int, constParts: List<IntArray>, asrtStmtSize: Int): Int {
+        if (leftConstPartIdx < 0) {
+            return constParts[0][0]
+        } else if (leftConstPartIdx < constParts.size-1) {
+            return constParts[leftConstPartIdx+1][0] - constParts[leftConstPartIdx][1] - 1
+        } else {
+            return asrtStmtSize - constParts[leftConstPartIdx][1] - 1
+        }
+    }
+
+    private fun findMatchingConstParts(
+        firstConstPartIdx: Int,
+        constParts: List<IntArray>,
+        matchingConstParts: Array<IntArray>,
+        stmt: IntArray,
+        asrtStmt: IntArray
+    ): Boolean {
+        for (i in firstConstPartIdx until constParts.size) {
+            val nextMatch = findFirstSubSeq(
+                where = stmt, startIdx = lengthOfGap(i-1, constParts, asrtStmt.size) + (if (i == 0) 0 else matchingConstParts[i-1][1]+1),
+                what = asrtStmt, begin = constParts[i][0], end = constParts[i][1]
+            )
+            if (nextMatch == null) {
+                return false
+            }
+            matchingConstParts[i] = nextMatch
+        }
+        return true
+    }
+
     private fun findPossibleSubstitutions(stmt: IntArray, assertion: Assertion): List<IntArray> {
         val asrtStmt = assertion.statement.content
         // TODO: 10/23/2021 move constParts to Assertion
@@ -29,28 +100,22 @@ object ProofAssistant {
                 constParts.last()[1] = i-1
             }
         }
-
-        fun lengthOfGap(leftConstPartIdx:Int): Int {
-            if (leftConstPartIdx < 0) {
-                return constParts[0][0]
-            } else if (leftConstPartIdx < constParts.size-1) {
-                return constParts[leftConstPartIdx+1][0] - constParts[leftConstPartIdx][1] - 1
-            } else {
-                return asrtStmt.size - constParts[leftConstPartIdx][1] - 1
-            }
+        if (constParts.isNotEmpty() && constParts.last()[1] < 0) {
+            constParts.last()[1] = asrtStmt.size-1
         }
 
-        val matchingConstParts = ArrayList<IntArray>()
+
+
+        val matchingConstParts = ArrayList<IntArray>(constParts.size)
         for (i in 0 until constParts.size) {
             val nextMatch = findFirstSubSeq(
-                where = stmt, startIdx = lengthOfGap(i-1) + (if (matchingConstParts.isEmpty()) 0 else matchingConstParts.last()[1]+1),
+                where = stmt, startIdx = lengthOfGap(i-1, constParts, asrtStmt.size) + (if (matchingConstParts.isEmpty()) 0 else matchingConstParts.last()[1]+1),
                 what = asrtStmt, begin = constParts[i][0], end = constParts[i][1]
             )
             if (nextMatch == null) {
                 break
-            } else {
-                matchingConstParts.add(nextMatch)
             }
+            matchingConstParts[i] = nextMatch
         }
         if (matchingConstParts.size != constParts.size) {
             return emptyList()
