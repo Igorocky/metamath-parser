@@ -18,10 +18,30 @@ object ProofAssistant {
 
     fun iterateMatchingConstParts(
         stmt: IntArray,
-        assertion: Assertion,
-        consumer: (constParts: ArrayList<IntArray>, matchingConstParts: List<IntArray>) -> Unit
+        asrtStmt: IntArray,
+        consumer: (constParts: List<IntArray>, matchingConstParts: Array<IntArray>) -> Unit
     ) {
-
+        // TODO: 10/23/2021 move constParts to Assertion
+        val constParts: ArrayList<IntArray> = ArrayList()
+        for (i in 0 until asrtStmt.size) {
+            if (asrtStmt[i] < 0) {
+                if (constParts.isEmpty() || constParts.last()[1] >= 0) {
+                    constParts.add(intArrayOf(i,-1))
+                }
+            } else if (constParts.isNotEmpty() && constParts.last()[1] < 0) {
+                constParts.last()[1] = i-1
+            }
+        }
+        if (constParts.isNotEmpty() && constParts.last()[1] < 0) {
+            constParts.last()[1] = asrtStmt.size-1
+        }
+        val matchingConstParts = Array(constParts.size){ intArrayOf() }
+        if (findLeftmostMatchingConstParts(0, constParts, matchingConstParts, stmt, asrtStmt)) {
+            consumer(constParts, matchingConstParts)
+        }
+        while (nextMatchingConstParts(stmt, asrtStmt, constParts, matchingConstParts)) {
+            consumer(constParts, matchingConstParts)
+        }
     }
 
     fun nextMatchingConstParts(
@@ -30,8 +50,15 @@ object ProofAssistant {
         constParts: ArrayList<IntArray>,
         matchingConstParts: Array<IntArray>
     ): Boolean {
+        val asrtEndsWithConst = constParts.last()[1] == asrtStmt.size-1
         var p = matchingConstParts.size-1
         while (p >= 0) {
+            if (p == 0 && constParts[0][0] == 0) {
+                return false
+            } else if (p == constParts.size-1 && asrtEndsWithConst) {
+                p--
+                continue
+            }
             val nextMatch = findFirstSubSeq(
                 where = stmt, startIdx = matchingConstParts[p][0]+1,
                 what = asrtStmt, begin = constParts[p][0], end = constParts[p][1]
@@ -39,7 +66,7 @@ object ProofAssistant {
             if (nextMatch != null) {
                 matchingConstParts[p] = nextMatch
                 if (p < matchingConstParts.size-1) {
-                    val allRemainingPartsFound = findMatchingConstParts(
+                    val allRemainingPartsFound = findLeftmostMatchingConstParts(
                         firstConstPartIdx = p+1,
                         constParts = constParts,
                         matchingConstParts = matchingConstParts,
@@ -47,9 +74,12 @@ object ProofAssistant {
                         asrtStmt = asrtStmt
                     )
                     if (!allRemainingPartsFound) {
-                        p--
                         continue
+                    } else {
+                        break
                     }
+                } else {
+                    break
                 }
             }
             p--
@@ -67,7 +97,7 @@ object ProofAssistant {
         }
     }
 
-    private fun findMatchingConstParts(
+    private fun findLeftmostMatchingConstParts(
         firstConstPartIdx: Int,
         constParts: List<IntArray>,
         matchingConstParts: Array<IntArray>,
@@ -75,14 +105,24 @@ object ProofAssistant {
         asrtStmt: IntArray
     ): Boolean {
         for (i in firstConstPartIdx until constParts.size) {
-            val nextMatch = findFirstSubSeq(
-                where = stmt, startIdx = lengthOfGap(i-1, constParts, asrtStmt.size) + (if (i == 0) 0 else matchingConstParts[i-1][1]+1),
-                what = asrtStmt, begin = constParts[i][0], end = constParts[i][1]
-            )
-            if (nextMatch == null) {
+            val startIdx = lengthOfGap(i - 1, constParts, asrtStmt.size) + (if (i == 0) 0 else matchingConstParts[i - 1][1] + 1)
+            val match = if (i == constParts.size-1 && constParts[i][1] == asrtStmt.size-1) {
+                val len = asrtStmt.size - constParts[i][0]
+                if (
+                    startIdx + len <= stmt.size
+                    && endsWith(what = stmt, pattern = asrtStmt, begin = constParts[i][0])
+                ) {
+                    intArrayOf(stmt.size-len, stmt.size-1)
+                } else {
+                    null
+                }
+            } else {
+                findFirstSubSeq(where = stmt, startIdx = startIdx, what = asrtStmt, begin = constParts[i][0], end = constParts[i][1])
+            }
+            if (match == null || i == 0 && constParts[0][0] == 0 && match[0] != 0) {
                 return false
             }
-            matchingConstParts[i] = nextMatch
+            matchingConstParts[i] = match
         }
         return true
     }
@@ -183,7 +223,7 @@ object ProofAssistant {
         var s = startIdx
         var e = s-1
         while (s <= maxS && e < s) {
-            if (where[s+i] == what[startIdx+i]) {
+            if (where[s+i] == what[begin+i]) {
                 if (i == len-1) {
                     e = s+i
                 } else {
@@ -195,5 +235,16 @@ object ProofAssistant {
             }
         }
         return if (s <= e) intArrayOf(s,e) else null
+    }
+
+    fun endsWith(what:IntArray, pattern:IntArray, begin:Int): Boolean {
+        val len = pattern.size - begin
+        val whatBegin = what.size - len
+        for (i in 0 until len) {
+            if (what[whatBegin+i] != pattern[begin+i]) {
+                return false
+            }
+        }
+        return true
     }
 }
