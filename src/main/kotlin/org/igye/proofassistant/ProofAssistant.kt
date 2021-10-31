@@ -38,9 +38,9 @@ object ProofAssistant {
         val matchingConstParts = Array(constParts.size){ intArrayOf() }
         if (findLeftmostMatchingConstParts(0, constParts, matchingConstParts, stmt, asrtStmt)) {
             consumer(constParts, matchingConstParts)
-        }
-        while (nextMatchingConstParts(stmt, asrtStmt, constParts, matchingConstParts)) {
-            consumer(constParts, matchingConstParts)
+            while (nextMatchingConstParts(stmt, asrtStmt, constParts, matchingConstParts)) {
+                consumer(constParts, matchingConstParts)
+            }
         }
     }
 
@@ -63,7 +63,7 @@ object ProofAssistant {
                 where = stmt, startIdx = matchingConstParts[p][0]+1,
                 what = asrtStmt, begin = constParts[p][0], end = constParts[p][1]
             )
-            if (nextMatch != null) {
+            if (nextMatch != null && (p < constParts.size-1 || stmt.size - nextMatch[1] >= asrtStmt.size - constParts.last()[1])) {
                 matchingConstParts[p] = nextMatch
                 if (p < matchingConstParts.size-1) {
                     val allRemainingPartsFound = findLeftmostMatchingConstParts(
@@ -123,6 +123,9 @@ object ProofAssistant {
                 return false
             }
             matchingConstParts[i] = match
+        }
+        if (stmt.size - matchingConstParts.last()[1] < asrtStmt.size - constParts.last()[1]) {
+            return false
         }
         return true
     }
