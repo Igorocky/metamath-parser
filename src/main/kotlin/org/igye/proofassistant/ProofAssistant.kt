@@ -18,7 +18,14 @@ object ProofAssistant {
 
     fun iterateSubstitutions(stmt:IntArray, asrtStmt:IntArray, numOfVariables:Int, consumer: ((IntArray) -> Unit)) {
         val subs = IntArray(numOfVariables*2)
-        iterateVarGroups(stmt, asrtStmt) {varGroups ->
+        iterateVarGroups(stmt, asrtStmt) varGroupsConsumer@{varGroups ->
+            for (i in 0 until varGroups.size-1) {
+                for (j in i+1 until varGroups.size) {
+                    if (!varGroups[i].doesntContradict(stmt, varGroups[j])) {
+                        return@varGroupsConsumer
+                    }
+                }
+            }
             subs.fill(-1)
             for (i in 0 until varGroups.size) {
                 val varGroup = varGroups[i]
