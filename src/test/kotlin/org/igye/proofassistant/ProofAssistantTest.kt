@@ -157,14 +157,11 @@ internal class ProofAssistantTest {
     fun iterateSubstitutions_test1() {
         testIterateSubstitutions(
             IterateSubstitutionsTestData(
-            asrtStmt = intArrayOf(PP,a,ARR,b),
+            asrtStmt = "|- a -> b",
             numOfVars = 2,
-            stmt = intArrayOf(PP,A,ARR,B),
+            stmt = "|- A -> B",
             expectedSubstitutions = listOf(
-                mapOf(
-                    0 to intArrayOf(A),
-                    1 to intArrayOf(B),
-                )
+                setOf("a: A", "b: B")
             )
         ))
     }
@@ -191,24 +188,26 @@ internal class ProofAssistantTest {
         //given
         testData.expectedSubstitutions.forEach {
             assertTrue(it.size == testData.numOfVars)
-            assertTrue(it.keys.all { it < testData.numOfVars })
-            for ((_,v) in it) {
-                assertTrue(v.isNotEmpty())
-            }
+            assertTrue(it.asSequence().map {
+                symbolToInt[it.split(":")[0].trim()]
+            }.all { it!! < testData.numOfVars })
         }
         var cnt = 0
         val expectedSubsStr: Set<String> = testData.expectedSubstitutions.map { subst ->
-            subst.keys.asSequence().sorted().map {varNum -> substToStr(varNum, 0, subst[varNum]!!.size-1, subst[varNum]!!) }.joinToString(separator = ", ")
+            subst.asSequence().sortedBy{symbolToInt[it.split(":")[0].trim()]!!}.joinToString(separator = ", ")
         }.toSet()
+        val stmt = testData.stmt.split(" ").map {
+            symbolToInt[it]!!
+        }.toIntArray()
 
         //when
         ProofAssistant.iterateSubstitutions(
-            testData.stmt,
-            testData.asrtStmt,
+            stmt,
+            testData.asrtStmt.split(" ").map { symbolToInt[it]!! }.toIntArray(),
             testData.numOfVars
         ) { subs: IntArray ->
             //then
-            val actualSubsStr = actualSubstToStr(subs, testData.stmt)
+            val actualSubsStr = actualSubstToStr(subs, stmt)
             assertTrue(expectedSubsStr.contains(actualSubsStr))
             cnt++
         }
@@ -223,9 +222,9 @@ internal class ProofAssistantTest {
 
     private fun substToStr(varNum:Int, stmtBegin:Int, stmtEnd:Int, stmt:IntArray): String {
         val sb = StringBuilder()
-        sb.append(varNum).append(" ->")
+        sb.append(intToSymbol[varNum]).append(":")
         for (i in stmtBegin .. stmtEnd) {
-            sb.append(" ").append(stmt[i])
+            sb.append(" ").append(intToSymbol[stmt[i]])
         }
         return sb.toString()
     }
@@ -246,10 +245,30 @@ internal class ProofAssistantTest {
     private val BRO = -10
     private val BRC = -11
     private val ARR = -12
+
     private val a = 0
     private val b = 1
     private val c = 2
     private val d = 3
+    private val intToSymbol = mapOf(
+        A to "A",
+        B to "B",
+        C to "C",
+        D to "D",
+        E to "E",
+        F to "F",
+        G to "G",
+        H to "H",
+        PP to "|-",
+        BRO to "(",
+        BRC to ")",
+        ARR to "->",
+        a to "a",
+        b to "b",
+        c to "c",
+        d to "d",
+    )
+    private val symbolToInt: Map<String, Int> = intToSymbol.asSequence().associate { (k,v) -> v to k }
 
     data class IterateMatchingConstPartsTestData(
         val asrtStmt: IntArray,
@@ -259,9 +278,9 @@ internal class ProofAssistantTest {
     )
 
     data class IterateSubstitutionsTestData(
-        val asrtStmt: IntArray,
+        val asrtStmt: String,
         val numOfVars: Int,
-        val stmt: IntArray,
-        val expectedSubstitutions: List<Map<Int,IntArray>>
+        val stmt: String,
+        val expectedSubstitutions: List<Set<String>>
     )
 }
