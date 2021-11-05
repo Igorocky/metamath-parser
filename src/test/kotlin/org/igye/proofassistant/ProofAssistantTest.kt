@@ -144,6 +144,29 @@ internal class ProofAssistantTest {
             stmt = intArrayOf(A,ARR,B,C,D),
             expectedMatchingConstParts = emptySet()
         ))
+
+        testIterateMatchingConstParts(IterateMatchingConstPartsTestData(
+            asrtStmt = intArrayOf(BRO,a,b,BRC),
+            expectedConstParts = "[[0,0],[3,3]]",
+            stmt = intArrayOf(BRO,A,BRC),
+            expectedMatchingConstParts = emptySet()
+        ))
+    }
+
+    @Test
+    fun iterateSubstitutions_test1() {
+        testIterateSubstitutions(
+            IterateSubstitutionsTestData(
+            asrtStmt = intArrayOf(PP,a,ARR,b),
+            numOfVars = 2,
+            stmt = intArrayOf(PP,A,ARR,B),
+            expectedSubstitutions = listOf(
+                mapOf(
+                    0 to intArrayOf(A),
+                    1 to intArrayOf(B),
+                )
+            )
+        ))
     }
 
     fun testIterateMatchingConstParts(testData: IterateMatchingConstPartsTestData) {
@@ -162,6 +185,49 @@ internal class ProofAssistantTest {
             cnt++
         }
         assertEquals(testData.expectedMatchingConstParts.size,cnt)
+    }
+
+    fun testIterateSubstitutions(testData: IterateSubstitutionsTestData) {
+        //given
+        testData.expectedSubstitutions.forEach {
+            assertTrue(it.size == testData.numOfVars)
+            assertTrue(it.keys.all { it < testData.numOfVars })
+            for ((_,v) in it) {
+                assertTrue(v.isNotEmpty())
+            }
+        }
+        var cnt = 0
+        val expectedSubsStr: Set<String> = testData.expectedSubstitutions.map { subst ->
+            subst.keys.asSequence().sorted().map {varNum -> substToStr(varNum, 0, subst[varNum]!!.size-1, subst[varNum]!!) }.joinToString(separator = ", ")
+        }.toSet()
+
+        //when
+        ProofAssistant.iterateSubstitutions(
+            testData.stmt,
+            testData.asrtStmt,
+            testData.numOfVars
+        ) { subs: IntArray ->
+            //then
+            val actualSubsStr = actualSubstToStr(subs, testData.stmt)
+            assertTrue(expectedSubsStr.contains(actualSubsStr))
+            cnt++
+        }
+        assertEquals(testData.expectedSubstitutions.size,cnt)
+    }
+
+    private fun actualSubstToStr(subs:IntArray, stmt:IntArray): String {
+        return (0 until subs.size/2).asSequence().map {varNum ->
+            substToStr(varNum, subs[varNum*2], subs[varNum*2+1], stmt)
+        }.joinToString(separator = ", ")
+    }
+
+    private fun substToStr(varNum:Int, stmtBegin:Int, stmtEnd:Int, stmt:IntArray): String {
+        val sb = StringBuilder()
+        sb.append(varNum).append(" ->")
+        for (i in stmtBegin .. stmtEnd) {
+            sb.append(" ").append(stmt[i])
+        }
+        return sb.toString()
     }
 
     private fun constPartsToStr(constParts:Array<IntArray>): String {
@@ -190,5 +256,12 @@ internal class ProofAssistantTest {
         val expectedConstParts: String,
         val stmt: IntArray,
         val expectedMatchingConstParts: Set<String>
+    )
+
+    data class IterateSubstitutionsTestData(
+        val asrtStmt: IntArray,
+        val numOfVars: Int,
+        val stmt: IntArray,
+        val expectedSubstitutions: List<Map<Int,IntArray>>
     )
 }

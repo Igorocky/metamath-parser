@@ -1,22 +1,32 @@
 package org.igye.proofassistant
 
+// TODO: 11/5/2021 move VarGroup to Assertion.proofAssistantData
 class VarGroup(
-    val vars:IntArray,
+    val asrtStmt:IntArray,
+    val numOfVars:Int,
+    val varsBeginIdx:Int,
     val sameVarsIdxs: IntArray?,
-    val exprBeginIdx:Int, val exprEndIdx:Int,
-    val subExprBegins: IntArray
+    val exprBeginIdx:Int,
+    val exprEndIdx:Int
 ) {
+    val subExprBegins: IntArray = IntArray(numOfVars+1)
+
+    fun init(stmt: IntArray):Boolean {
+        init()
+        return doesntContradictItself(stmt) || nextDelims(stmt)
+    }
+
     fun init() {
-        for (i in 0 until vars.size) {
+        for (i in 0 until numOfVars) {
             subExprBegins[i] = exprBeginIdx+i
         }
-        subExprBegins[vars.size]=exprEndIdx+1
+        subExprBegins[numOfVars]=exprEndIdx+1
     }
 
     fun doesntContradict(stmt: IntArray, otherVarGroup: VarGroup):Boolean {
-        for (i in 0 until vars.size) {
-            for (j in 0 until otherVarGroup.vars.size) {
-                if (vars[i] == otherVarGroup.vars[j]) {
+        for (i in 0 until numOfVars) {
+            for (j in 0 until otherVarGroup.numOfVars) {
+                if (asrtStmt[varsBeginIdx+i] == otherVarGroup.asrtStmt[otherVarGroup.varsBeginIdx + j]) {
                     val begin1 = subExprBegins[i]
                     val end1 = subExprBegins[i+1]-1
                     val begin2 = otherVarGroup.subExprBegins[j]
@@ -63,6 +73,15 @@ class VarGroup(
             }
         }
         return true
+    }
+
+    fun nextDelims(stmt: IntArray): Boolean {
+        while (nextDelims()) {
+            if (doesntContradictItself(stmt)) {
+                return true
+            }
+        }
+        return false
     }
 
     fun nextDelims(): Boolean {

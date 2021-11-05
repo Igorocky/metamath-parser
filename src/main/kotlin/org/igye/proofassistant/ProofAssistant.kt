@@ -16,6 +16,112 @@ object ProofAssistant {
         return ConstStackNode(Statement(type = 'n',content = intArrayOf()))
     }
 
+    fun iterateSubstitutions(stmt:IntArray, asrtStmt:IntArray, numOfVariables:Int, consumer: ((IntArray) -> Unit)) {
+        val subs = IntArray(numOfVariables*2)
+        iterateVarGroups(stmt, asrtStmt) {varGroups ->
+            subs.fill(-1)
+            for (i in 0 until varGroups.size) {
+                val varGroup = varGroups[i]
+                for (j in 0 until varGroup.numOfVars) {
+                    val varNum = asrtStmt[varGroup.varsBeginIdx+j]
+                    if (subs[varNum*2] < 0) {
+                        subs[varNum*2] = varGroup.subExprBegins[j]
+                        subs[varNum*2+1] = varGroup.subExprBegins[j+1]-1
+                    }
+                }
+            }
+            consumer(subs)
+        }
+    }
+
+    fun iterateVarGroups(stmt:IntArray, asrtStmt:IntArray, consumer: ((List<VarGroup>) -> Unit)) {
+        iterateMatchingConstParts(stmt, asrtStmt) matchingConstPartsConsumer@{ constParts: List<IntArray>, matchingConstParts: Array<IntArray> ->
+            val varGroups = createVarGroups(stmt, asrtStmt, constParts, matchingConstParts)
+            for (i in 0 until varGroups.size) {
+                if (!varGroups[i].init(stmt)) {
+                    return@matchingConstPartsConsumer
+                }
+            }
+            consumer(varGroups)
+            while (nextVarGroups(varGroups,stmt)) {
+                consumer(varGroups)
+            }
+        }
+    }
+
+    fun createVarGroups(stmt:IntArray, asrtStmt:IntArray, constParts: List<IntArray>, matchingConstParts: Array<IntArray>):List<VarGroup> {
+        val result = ArrayList<VarGroup>()
+        if (constParts[0][0] > 0) {
+            result.add(
+                VarGroup(
+                    asrtStmt = asrtStmt,
+                    numOfVars = constParts[0][0],
+                    varsBeginIdx = 0,
+                    sameVarsIdxs = createSameVarsIdxs(asrtStmt, 0, constParts[0][0]-1),
+                    exprBeginIdx = 0,
+                    exprEndIdx = matchingConstParts[0][0]
+            ))
+        }
+        for (i in 0 .. constParts.size-2) {
+            result.add(
+                VarGroup(
+                    asrtStmt = asrtStmt,
+                    numOfVars = constParts[i+1][0] - constParts[i][1] - 1,
+                    varsBeginIdx = constParts[i][1]+1,
+                    sameVarsIdxs = createSameVarsIdxs(asrtStmt, constParts[i][1]+1, constParts[i+1][0]-1),
+                    exprBeginIdx = matchingConstParts[i][1]+1,
+                    exprEndIdx = matchingConstParts[i+1][0]-1
+                ))
+        }
+        val lastConstPart = constParts.last()
+        if (lastConstPart[1] != asrtStmt.size-1) {
+            result.add(
+                VarGroup(
+                    asrtStmt = asrtStmt,
+                    numOfVars = asrtStmt.size - lastConstPart[1] - 1,
+                    varsBeginIdx = lastConstPart[1]+1,
+                    sameVarsIdxs = createSameVarsIdxs(asrtStmt, lastConstPart[1]+1, asrtStmt.size-1),
+                    exprBeginIdx = matchingConstParts.last()[1]+1,
+                    exprEndIdx = stmt.size-1
+                ))
+        }
+        return result
+    }
+
+    fun createSameVarsIdxs(asrtStmt:IntArray, begin:Int, end:Int): IntArray? {
+        var result:ArrayList<Int>? = null
+        for(i in begin .. end) {
+            for (j in i+1 .. end) {
+                if (asrtStmt[i] == asrtStmt[j]) {
+                    if (result == null) {
+                        result = ArrayList()
+                    }
+                    result.add(i)
+                    result.add(j)
+                }
+            }
+        }
+        return result?.toIntArray()
+    }
+
+    fun nextVarGroups(groups: List<VarGroup>, stmt: IntArray): Boolean {
+        var p = groups.size-1
+        while (p >= 0) {
+            if (groups[p].nextDelims()) {
+                for (i in p+1 until groups.size) {
+                    if (!groups[i].init(stmt)) {
+                        throw MetamathParserException("!groups[i].init(stmt)")
+                    }
+                }
+                break
+            } else {
+                p--
+            }
+        }
+        return p >= 0
+    }
+
+
     fun iterateMatchingConstParts(
         stmt: IntArray,
         asrtStmt: IntArray,

@@ -9,11 +9,12 @@ internal class VarGroupTest {
     fun nextDelims_processes_delimiters_as_expected() {
         //given
         val varGrp = VarGroup(
-            vars = intArrayOf(0,1,2),
+            asrtStmt = intArrayOf(0,1,2),
+            numOfVars = 3,
+            varsBeginIdx = 0,
             sameVarsIdxs = null,
             exprBeginIdx = 10,
             exprEndIdx = 14,
-            subExprBegins = IntArray(4)
         )
 
         //when
@@ -55,11 +56,12 @@ internal class VarGroupTest {
         //then
         assertTrue(
             VarGroup(
-                vars = intArrayOf(0,1,2),
+                asrtStmt = intArrayOf(0,1,2),
+                numOfVars = 3,
+                varsBeginIdx = 0,
                 sameVarsIdxs = null,
                 exprBeginIdx = 1,
                 exprEndIdx = 8,
-                subExprBegins = intArrayOf(1,3,6,9)
             ).doesntContradictItself(stmt)
         )
 
@@ -68,11 +70,12 @@ internal class VarGroupTest {
         //then
         assertFalse(
             VarGroup(
-                vars = intArrayOf(2,1,2),
+                asrtStmt = intArrayOf(2,1,2),
+                numOfVars = 3,
+                varsBeginIdx = 0,
                 sameVarsIdxs = intArrayOf(0,2),
                 exprBeginIdx = 1,
                 exprEndIdx = 8,
-                subExprBegins = intArrayOf(1,3,6,9)
             ).doesntContradictItself(stmt)
         )
 
@@ -81,11 +84,12 @@ internal class VarGroupTest {
         //then
         assertTrue(
             VarGroup(
-                vars = intArrayOf(2,1,2),
+                asrtStmt = intArrayOf(2,1,2),
+                numOfVars = 3,
+                varsBeginIdx = 0,
                 sameVarsIdxs = intArrayOf(0,2),
                 exprBeginIdx = 1,
                 exprEndIdx = 8,
-                subExprBegins = intArrayOf(1,4,6,9)
             ).doesntContradictItself(stmt)
         )
 
@@ -94,11 +98,12 @@ internal class VarGroupTest {
         //then
         assertFalse(
             VarGroup(
-                vars = intArrayOf(2,1,2),
+                asrtStmt = intArrayOf(2,1,2),
+                numOfVars = 3,
+                varsBeginIdx = 0,
                 sameVarsIdxs = intArrayOf(0,2),
                 exprBeginIdx = 1,
                 exprEndIdx = 8,
-                subExprBegins = intArrayOf(1,4,6,9)
             ).doesntContradictItself(stmt)
         )
     }
@@ -109,18 +114,20 @@ internal class VarGroupTest {
         var stmt = intArrayOf(0,1,2,3,4,5,1,2,3,9)
         //then
         val varGrp1 = VarGroup(
-            vars = intArrayOf(0, 1, 2),
+            asrtStmt = intArrayOf(0, 1, 2),
+            numOfVars = 3,
+            varsBeginIdx = 0,
             sameVarsIdxs = null,
             exprBeginIdx = 1,
             exprEndIdx = 8,
-            subExprBegins = intArrayOf(1, 4, 6, 9)
         )
         val varGrp2 = VarGroup(
-            vars = intArrayOf(2, 1, 3),
+            asrtStmt = intArrayOf(2, 1, 3),
+            numOfVars = 3,
+            varsBeginIdx = 0,
             sameVarsIdxs = null,
             exprBeginIdx = 1,
             exprEndIdx = 8,
-            subExprBegins = intArrayOf(1, 4, 6, 9)
         )
         assertTrue(varGrp1.doesntContradict(stmt, varGrp2))
 
@@ -128,18 +135,20 @@ internal class VarGroupTest {
         stmt = intArrayOf(0,1,1,3,4,5,1,2,3,9)
         //then
         val varGrp3 = VarGroup(
-            vars = intArrayOf(0, 1, 2),
+            asrtStmt = intArrayOf(0, 1, 2),
+            numOfVars = 3,
+            varsBeginIdx = 0,
             sameVarsIdxs = null,
             exprBeginIdx = 1,
             exprEndIdx = 8,
-            subExprBegins = intArrayOf(1, 4, 6, 9)
         )
         val varGrp4 = VarGroup(
-            vars = intArrayOf(2, 1, 3),
+            asrtStmt = intArrayOf(2, 1, 3),
+            numOfVars = 3,
+            varsBeginIdx = 0,
             sameVarsIdxs = null,
             exprBeginIdx = 1,
             exprEndIdx = 8,
-            subExprBegins = intArrayOf(1, 4, 6, 9)
         )
         assertFalse(varGrp3.doesntContradict(stmt, varGrp4))
     }
