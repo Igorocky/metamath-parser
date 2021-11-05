@@ -154,14 +154,54 @@ internal class ProofAssistantTest {
     }
 
     @Test
-    fun iterateSubstitutions_test1() {
-        testIterateSubstitutions(
-            IterateSubstitutionsTestData(
+    fun iterateSubstitutions_one_option() {
+        testIterateSubstitutions(IterateSubstitutionsTestData(
             asrtStmt = "|- a -> b",
-            numOfVars = 2,
             stmt = "|- A -> B",
             expectedSubstitutions = listOf(
-                setOf("a: A", "b: B")
+                setOf("a: A", "b: B"),
+            )
+        ))
+    }
+
+    @Test
+    fun iterateSubstitutions_two_options() {
+        testIterateSubstitutions(IterateSubstitutionsTestData(
+            asrtStmt = "|- a -> b",
+            stmt = "|- A -> B -> C",
+            expectedSubstitutions = listOf(
+                setOf("a: A", "b: B -> C"),
+                setOf("a: A -> B", "b: C"),
+            )
+        ))
+    }
+
+    @Test
+    fun iterateSubstitutions_zero_options() {
+        testIterateSubstitutions(IterateSubstitutionsTestData(
+            asrtStmt = "|- a -> b",
+            stmt = "|- A = B",
+            expectedSubstitutions = listOf()
+        ))
+    }
+
+    @Test
+    fun iterateSubstitutions_one_variable_repeats() {
+        testIterateSubstitutions(IterateSubstitutionsTestData(
+            asrtStmt = "|- a -> b",
+            stmt = "|- A -> B -> A -> B",
+            expectedSubstitutions = listOf(
+                setOf("a: A", "b: B -> A -> B"),
+                setOf("a: A -> B", "b: A -> B"),
+                setOf("a: A -> B -> A", "b: B"),
+            )
+        ))
+
+        testIterateSubstitutions(IterateSubstitutionsTestData(
+            asrtStmt = "|- a -> a",
+            stmt = "|- A -> B -> A -> B",
+            expectedSubstitutions = listOf(
+                setOf("a: A -> B"),
             )
         ))
     }
@@ -186,11 +226,12 @@ internal class ProofAssistantTest {
 
     fun testIterateSubstitutions(testData: IterateSubstitutionsTestData) {
         //given
+        val numOfVars = testData.asrtStmt.split(" ").asSequence().map { symbolToInt[it]!! }.filter { it >= 0 }.toSet().size
         testData.expectedSubstitutions.forEach {
-            assertTrue(it.size == testData.numOfVars)
+            assertTrue(it.size == numOfVars)
             assertTrue(it.asSequence().map {
                 symbolToInt[it.split(":")[0].trim()]
-            }.all { it!! < testData.numOfVars })
+            }.all { it!! < numOfVars })
         }
         var cnt = 0
         val expectedSubsStr: Set<String> = testData.expectedSubstitutions.map { subst ->
@@ -204,9 +245,11 @@ internal class ProofAssistantTest {
         ProofAssistant.iterateSubstitutions(
             stmt,
             testData.asrtStmt.split(" ").map { symbolToInt[it]!! }.toIntArray(),
-            testData.numOfVars
+            numOfVars
         ) { subs: IntArray ->
             //then
+            val asrtStmtStr = testData.asrtStmt
+            val stmtStr = testData.stmt
             val actualSubsStr = actualSubstToStr(subs, stmt)
             assertTrue(expectedSubsStr.contains(actualSubsStr))
             cnt++
@@ -245,6 +288,7 @@ internal class ProofAssistantTest {
     private val BRO = -10
     private val BRC = -11
     private val ARR = -12
+    private val EQ = -13
 
     private val a = 0
     private val b = 1
@@ -263,6 +307,7 @@ internal class ProofAssistantTest {
         BRO to "(",
         BRC to ")",
         ARR to "->",
+        EQ to "=",
         a to "a",
         b to "b",
         c to "c",
@@ -279,7 +324,6 @@ internal class ProofAssistantTest {
 
     data class IterateSubstitutionsTestData(
         val asrtStmt: String,
-        val numOfVars: Int,
         val stmt: String,
         val expectedSubstitutions: List<Set<String>>
     )
