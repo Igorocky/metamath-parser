@@ -1,4 +1,5 @@
 package org.igye.proofassistant
+package org.igye.proofassistant
 
 import org.igye.metamathparser.*
 
@@ -97,14 +98,14 @@ object ProofAssistant {
 
     fun createSameVarsIdxs(asrtStmt:IntArray, begin:Int, end:Int): IntArray? {
         var result:ArrayList<Int>? = null
-        for(i in begin .. end) {
+        for(i in begin .. end-1) {
             for (j in i+1 .. end) {
                 if (asrtStmt[i] == asrtStmt[j]) {
                     if (result == null) {
                         result = ArrayList()
                     }
-                    result.add(i)
-                    result.add(j)
+                    result.add(i-begin)
+                    result.add(j-begin)
                 }
             }
         }

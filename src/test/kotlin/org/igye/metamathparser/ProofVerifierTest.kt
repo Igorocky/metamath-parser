@@ -45,16 +45,28 @@ internal class ProofVerifierTest {
     @Test
     fun successfully_verifies_all_compressed_valid_proofs() {
         //given
+//        val assertions: Map<String, Assertion> =
+//            Parsers.parseMetamathFile(
+//                text = Utils.readStringFromClassPath("/set-reduced.mm"), rootContext = MetamathContext(), exprProc = ExpressionProcessor
+//            ).getAssertions()
+
         val assertions: Map<String, Assertion> =
             Parsers.parseMetamathFile(
-                text = Utils.readStringFromClassPath("/set-reduced.mm"), rootContext = MetamathContext(), exprProc = ExpressionProcessor
+                text = File("C:\\igye\\books\\metamath/set.mm").readText(), rootContext = MetamathContext(), exprProc = ExpressionProcessor
             ).getAssertions()
-//            Parsers.parseMetamathFile(text = File("C:\\igye\\books\\metamath/set.mm").readText(), ExpressionProcessor).getAssertions()
+        var cnt = 0.0
 
         //when
         val verifiedTheorems = assertions.values.asSequence()
             .filter { it.statement.type == 'p' }
-            .filter { ProofVerifier.verifyProof(it) != null }
+            .filter { it.statement.label == "dipdir" }
+            .filter {
+                println("verifying ${it.statement.label}")
+                val res = ProofVerifier.verifyProof(it) != null
+                cnt++
+                println("${cnt/assertions.size*100}%")
+                res
+            }
             .map { it.statement.label }
             .toList()
 

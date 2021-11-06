@@ -46,7 +46,7 @@ class VarGroup(
         } else {
             for (i in 0 until sameVarsIdxs.size/2) {
                 val idx = i*2
-                if (!contentEquals(stmt, sameVarsIdxs[idx], sameVarsIdxs[idx+1])) {
+                if (!contentEquals(stmt = stmt, var1Idx = sameVarsIdxs[idx], var2Idx = sameVarsIdxs[idx+1])) {
                     return false
                 }
             }

@@ -206,6 +206,27 @@ internal class ProofAssistantTest {
         ))
     }
 
+    @Test
+    fun iterateSubstitutions_case1_from_set_mm() {
+//        val stmt = "|- ( ( A e. ( BaseSet ` if ( U e. CPreHilOLD , U , <. <. + , x. >. , abs >. ) ) /\\ B e. ( BaseSet ` if ( U e. CPreHilOLD , U , <. <. + , x. >. , abs >. ) ) /\\ C e. ( BaseSet ` if ( U e. CPreHilOLD , U , <. <. + , x. >. , abs >. ) ) ) -> ( ( A ( +v ` if ( U e. CPreHilOLD , U , <. <. + , x. >. , abs >. ) ) B ) ( .iOLD ` if ( U e. CPreHilOLD , U , <. <. + , x. >. , abs >. ) ) C ) = ( ( A ( .iOLD ` if ( U e. CPreHilOLD , U , <. <. + , x. >. , abs >. ) ) C ) + ( B ( .iOLD ` if ( U e. CPreHilOLD , U , <. <. + , x. >. , abs >. ) ) C ) ) )"
+//        stmt.split(" ").asSequence().filter { !symbolToInt.containsKey(it) }.toSet().forEach { println(it) }
+
+        testIterateSubstitutions(IterateSubstitutionsTestData(
+            asrtStmt = "|- ( ( a e. f /\\ b e. f /\\ c e. f ) -> ( ( a e b ) d c ) = ( ( a d c ) + ( b d c ) ) )",
+            stmt = "|- ( ( A e. ( BaseSet ` if ( U e. CPreHilOLD , U , <. <. + , x. >. , abs >. ) ) /\\ B e. ( BaseSet ` if ( U e. CPreHilOLD , U , <. <. + , x. >. , abs >. ) ) /\\ C e. ( BaseSet ` if ( U e. CPreHilOLD , U , <. <. + , x. >. , abs >. ) ) ) -> ( ( A ( +v ` if ( U e. CPreHilOLD , U , <. <. + , x. >. , abs >. ) ) B ) ( .iOLD ` if ( U e. CPreHilOLD , U , <. <. + , x. >. , abs >. ) ) C ) = ( ( A ( .iOLD ` if ( U e. CPreHilOLD , U , <. <. + , x. >. , abs >. ) ) C ) + ( B ( .iOLD ` if ( U e. CPreHilOLD , U , <. <. + , x. >. , abs >. ) ) C ) ) )",
+            expectedSubstitutions = listOf(
+                setOf(
+                    "a: A",
+                    "b: B",
+                    "c: C",
+                    "d: ( .iOLD ` if ( U e. CPreHilOLD , U , <. <. + , x. >. , abs >. ) )",
+                    "e: ( +v ` if ( U e. CPreHilOLD , U , <. <. + , x. >. , abs >. ) )",
+                    "f: ( BaseSet ` if ( U e. CPreHilOLD , U , <. <. + , x. >. , abs >. ) )"
+                ),
+            )
+        ))
+    }
+
     fun testIterateMatchingConstParts(testData: IterateMatchingConstPartsTestData) {
         //given
         var cnt = 0
@@ -294,6 +315,12 @@ internal class ProofAssistantTest {
     private val b = 1
     private val c = 2
     private val d = 3
+    private val e = 4
+    private val f = 5
+    private val g = 6
+    private val h = 7
+
+    private var constSnt = EQ-1
     private val intToSymbol = mapOf(
         A to "A",
         B to "B",
@@ -308,10 +335,29 @@ internal class ProofAssistantTest {
         BRC to ")",
         ARR to "->",
         EQ to "=",
+        constSnt-- to "e.",
+        constSnt-- to "BaseSet",
+        constSnt-- to "`",
+        constSnt-- to "if",
+        constSnt-- to "U",
+        constSnt-- to "CPreHilOLD",
+        constSnt-- to ",",
+        constSnt-- to "<.",
+        constSnt-- to "+",
+        constSnt-- to "x.",
+        constSnt-- to ">.",
+        constSnt-- to "abs",
+        constSnt-- to "/\\",
+        constSnt-- to "+v",
+        constSnt-- to ".iOLD",
         a to "a",
         b to "b",
         c to "c",
         d to "d",
+        e to "e",
+        f to "f",
+        g to "g",
+        h to "h",
     )
     private val symbolToInt: Map<String, Int> = intToSymbol.asSequence().associate { (k,v) -> v to k }
 
