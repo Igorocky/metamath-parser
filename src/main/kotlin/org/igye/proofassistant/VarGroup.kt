@@ -10,6 +10,7 @@ class VarGroup(
     val exprEndIdx:Int
 ) {
     val subExprBegins: IntArray = IntArray(numOfVars+1)
+    val numberOfStates = numberOfStates(numOfVars = numOfVars, subExprLength = exprEndIdx-exprBeginIdx+1)
 
     fun init(stmt: IntArray):Boolean {
         init()
@@ -97,5 +98,25 @@ class VarGroup(
             i--
         }
         return i > 0
+    }
+
+    companion object {
+        fun numberOfStates(numOfVars:Int, subExprLength:Int): Long {
+            val n = subExprLength - 1L
+            val k = numOfVars - 1L
+
+            var res = 1L
+            var rem = 2L
+            for (i in (n-k)+1 .. n) {
+                res = Math.multiplyExact(res,i)
+                while (rem <= k && res.mod(rem) == 0L) {
+                    res /= rem++
+                }
+            }
+            while (rem <= k) {
+                res /= rem++
+            }
+            return res
+        }
     }
 }

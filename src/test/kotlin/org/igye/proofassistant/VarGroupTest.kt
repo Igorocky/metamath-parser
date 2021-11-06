@@ -1,7 +1,6 @@
 package org.igye.proofassistant
 
-import org.junit.Assert.assertFalse
-import org.junit.Assert.assertTrue
+import org.junit.Assert.*
 import org.junit.Test
 
 internal class VarGroupTest {
@@ -151,5 +150,43 @@ internal class VarGroupTest {
             exprEndIdx = 8,
         )
         assertFalse(varGrp3.doesntContradict(stmt, varGrp4))
+    }
+
+    @Test
+    fun numberOfStates_produces_correct_results() {
+        //given
+        fun numberOfStatesExpected(numOfVars:Int, subExprLength:Int): Long {
+            val grp = VarGroup(
+                asrtStmt = IntArray(numOfVars){it},
+                numOfVars = numOfVars,
+                varsBeginIdx = 0,
+                sameVarsIdxs = null,
+                exprBeginIdx = 0,
+                exprEndIdx = subExprLength-1
+            )
+            grp.init()
+            var cnt = 1L
+            while (grp.nextDelims()) {
+                cnt++
+            }
+            return cnt
+        }
+
+        //then
+        for (numOfVars in 1 .. 10) {
+            for (subExprLength in numOfVars .. 40) {
+                assertEquals(
+                    numberOfStatesExpected(numOfVars = numOfVars, subExprLength = subExprLength),
+                    VarGroup(
+                        asrtStmt = IntArray(numOfVars){it},
+                        numOfVars = numOfVars,
+                        varsBeginIdx = 0,
+                        sameVarsIdxs = null,
+                        exprBeginIdx = 0,
+                        exprEndIdx = subExprLength-1
+                    ).numberOfStates
+                )
+            }
+        }
     }
 }

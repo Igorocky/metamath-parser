@@ -1,7 +1,7 @@
 package org.igye.proofassistant
-package org.igye.proofassistant
 
 import org.igye.metamathparser.*
+import java.util.*
 
 object ProofAssistant {
     fun prove(expr: String, ctx: MetamathContext): StackNode {
@@ -93,6 +93,7 @@ object ProofAssistant {
                     exprEndIdx = stmt.size-1
                 ))
         }
+        Collections.sort(result, compareBy { it.numberOfStates })
         return result
     }
 
