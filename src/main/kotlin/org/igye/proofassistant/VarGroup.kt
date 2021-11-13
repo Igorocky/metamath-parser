@@ -7,7 +7,8 @@ class VarGroup(
     val varsBeginIdx:Int,
     val sameVarsIdxs: IntArray?,
     val exprBeginIdx:Int,
-    val exprEndIdx:Int
+    val exprEndIdx:Int,
+    var level:Int = -1,
 ) {
     val subExprBegins: IntArray = IntArray(numOfVars+1)
     val numberOfStates = numberOfStates(numOfVars = numOfVars, subExprLength = exprEndIdx-exprBeginIdx+1)

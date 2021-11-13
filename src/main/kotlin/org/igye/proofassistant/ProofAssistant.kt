@@ -42,6 +42,95 @@ object ProofAssistant {
         }
     }
 
+    fun iterateSubstitutions(stmt:IntArray, asrtStmt:IntArray, consumer: ((Substitution) -> Unit)) {
+        val numOfVariables = asrtStmt.asSequence().filter { it >= 0 }.maxOrNull()!!+1
+        iterateMatchingConstParts(stmt, asrtStmt) matchingConstPartsConsumer@{ constParts: List<IntArray>, matchingConstParts: Array<IntArray> ->
+            val varGroups = createVarGroups2(stmt, asrtStmt, constParts, matchingConstParts)
+            val subs = Substitution(
+                stmt = stmt,
+                begins = IntArray(numOfVariables),
+                ends = IntArray(numOfVariables),
+                levels = IntArray(numOfVariables){Int.MAX_VALUE}
+            )
+            iterateSubstitutions(
+                currSubs = subs,
+                varGroups = varGroups,
+                currGrpIdx = 0,
+                currVarIdx = 0,
+                subExprBeginIdx = varGroups[0].exprBeginIdx,
+                consumer = consumer
+            )
+        }
+    }
+
+    fun iterateSubstitutions(
+        currSubs:Substitution,
+        varGroups:List<VarGroup2>, currGrpIdx:Int, currVarIdx:Int, subExprBeginIdx:Int,
+        consumer: ((Substitution) -> Unit)
+    ) {
+        val stmt = currSubs.stmt
+        val grp = varGroups[currGrpIdx]
+        val varNum = grp.asrtStmt[grp.varsBeginIdx + currVarIdx]
+        val level = grp.level+currVarIdx
+        val maxSubExprLength = grp.exprEndIdx-grp.exprBeginIdx+1-(grp.numOfVars-currVarIdx-1)
+
+        fun invokeNext(subExprLength:Int) {
+            if (currVarIdx < grp.numOfVars-1) {
+                iterateSubstitutions(
+                    currSubs = currSubs,
+                    varGroups = varGroups,
+                    currGrpIdx = currGrpIdx,
+                    currVarIdx = currVarIdx+1,
+                    subExprBeginIdx = subExprBeginIdx+subExprLength,
+                    consumer = consumer
+                )
+            } else if (currGrpIdx < varGroups.size-1) {
+                iterateSubstitutions(
+                    currSubs = currSubs,
+                    varGroups = varGroups,
+                    currGrpIdx = currGrpIdx+1,
+                    currVarIdx = 0,
+                    subExprBeginIdx = varGroups[currGrpIdx+1].exprBeginIdx,
+                    consumer = consumer
+                )
+            } else {
+                consumer(currSubs)
+            }
+        }
+
+        if (currSubs.levels[varNum] >= level) {
+            currSubs.levels[varNum] = level
+            if (currVarIdx == grp.numOfVars-1) {
+                currSubs.begins[varNum] = subExprBeginIdx
+                currSubs.ends[varNum] = grp.exprEndIdx
+                invokeNext(subExprLength = maxSubExprLength)
+            } else {
+                currSubs.levels[varNum] = level
+                currSubs.begins[varNum] = subExprBeginIdx
+                var subExprLength = 1
+                while (subExprLength <= maxSubExprLength) {
+                    currSubs.ends[varNum] = subExprBeginIdx+subExprLength-1
+                    invokeNext(subExprLength = subExprLength)
+                    subExprLength++
+                }
+            }
+            currSubs.levels[varNum] = Int.MAX_VALUE
+        } else {
+            val existingSubExprBeginIdx = currSubs.begins[varNum]
+            val existingSubLength = currSubs.ends[varNum]- existingSubExprBeginIdx +1
+            if (existingSubLength <= maxSubExprLength) {
+                var checkedLength = 0
+                while (checkedLength < existingSubLength
+                    && stmt[existingSubExprBeginIdx+checkedLength] == stmt[subExprBeginIdx+checkedLength]) {
+                    checkedLength++
+                }
+                if (checkedLength == existingSubLength) {
+                    invokeNext(subExprLength = checkedLength)
+                }
+            }
+        }
+    }
+
     fun iterateVarGroups(stmt:IntArray, asrtStmt:IntArray, consumer: ((List<VarGroup>) -> Unit)) {
         iterateMatchingConstParts(stmt, asrtStmt) matchingConstPartsConsumer@{ constParts: List<IntArray>, matchingConstParts: Array<IntArray> ->
             val varGroups = createVarGroups(stmt, asrtStmt, constParts, matchingConstParts)
@@ -94,6 +183,53 @@ object ProofAssistant {
                 ))
         }
         Collections.sort(result, compareBy { it.numberOfStates })
+        var level = 0
+        for (varGroup in result) {
+            varGroup.level=level
+            level+=varGroup.numOfVars
+        }
+        return result
+    }
+
+    fun createVarGroups2(stmt:IntArray, asrtStmt:IntArray, constParts: List<IntArray>, matchingConstParts: Array<IntArray>):List<VarGroup2> {
+        val result = ArrayList<VarGroup2>()
+        if (constParts[0][0] > 0) {
+            result.add(
+                VarGroup2(
+                    asrtStmt = asrtStmt,
+                    numOfVars = constParts[0][0],
+                    varsBeginIdx = 0,
+                    exprBeginIdx = 0,
+                    exprEndIdx = matchingConstParts[0][0]
+            ))
+        }
+        for (i in 0 .. constParts.size-2) {
+            result.add(
+                VarGroup2(
+                    asrtStmt = asrtStmt,
+                    numOfVars = constParts[i+1][0] - constParts[i][1] - 1,
+                    varsBeginIdx = constParts[i][1]+1,
+                    exprBeginIdx = matchingConstParts[i][1]+1,
+                    exprEndIdx = matchingConstParts[i+1][0]-1
+                ))
+        }
+        val lastConstPart = constParts.last()
+        if (lastConstPart[1] != asrtStmt.size-1) {
+            result.add(
+                VarGroup2(
+                    asrtStmt = asrtStmt,
+                    numOfVars = asrtStmt.size - lastConstPart[1] - 1,
+                    varsBeginIdx = lastConstPart[1]+1,
+                    exprBeginIdx = matchingConstParts.last()[1]+1,
+                    exprEndIdx = stmt.size-1
+                ))
+        }
+        Collections.sort(result, compareBy { it.numberOfStates })
+        var level = 0
+        for (varGroup in result) {
+            varGroup.level=level
+            level+=varGroup.numOfVars
+        }
         return result
     }
 
@@ -116,7 +252,7 @@ object ProofAssistant {
     fun nextVarGroups(groups: List<VarGroup>, stmt: IntArray): Boolean {
         var p = groups.size-1
         while (p >= 0) {
-            if (groups[p].nextDelims()) {
+            if (groups[p].nextDelims(stmt)) {
                 for (i in p+1 until groups.size) {
                     if (!groups[i].init(stmt)) {
                         throw MetamathParserException("!groups[i].init(stmt)")

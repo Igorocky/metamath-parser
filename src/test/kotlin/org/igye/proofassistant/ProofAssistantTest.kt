@@ -247,13 +247,6 @@ internal class ProofAssistantTest {
 
     fun testIterateSubstitutions(testData: IterateSubstitutionsTestData) {
         //given
-        val numOfVars = testData.asrtStmt.split(" ").asSequence().map { symbolToInt[it]!! }.filter { it >= 0 }.toSet().size
-        testData.expectedSubstitutions.forEach {
-            assertTrue(it.size == numOfVars)
-            assertTrue(it.asSequence().map {
-                symbolToInt[it.split(":")[0].trim()]
-            }.all { it!! < numOfVars })
-        }
         var cnt = 0
         val expectedSubsStr: Set<String> = testData.expectedSubstitutions.map { subst ->
             subst.asSequence().sortedBy{symbolToInt[it.split(":")[0].trim()]!!}.joinToString(separator = ", ")
@@ -265,22 +258,21 @@ internal class ProofAssistantTest {
         //when
         ProofAssistant.iterateSubstitutions(
             stmt,
-            testData.asrtStmt.split(" ").map { symbolToInt[it]!! }.toIntArray(),
-            numOfVars
-        ) { subs: IntArray ->
+            testData.asrtStmt.split(" ").map { symbolToInt[it]!! }.toIntArray()
+        ) { subs: Substitution ->
             //then
             val asrtStmtStr = testData.asrtStmt
             val stmtStr = testData.stmt
-            val actualSubsStr = actualSubstToStr(subs, stmt)
+            val actualSubsStr = actualSubstToStr(subs)
             assertTrue(expectedSubsStr.contains(actualSubsStr))
             cnt++
         }
         assertEquals(testData.expectedSubstitutions.size,cnt)
     }
 
-    private fun actualSubstToStr(subs:IntArray, stmt:IntArray): String {
-        return (0 until subs.size/2).asSequence().map {varNum ->
-            substToStr(varNum, subs[varNum*2], subs[varNum*2+1], stmt)
+    private fun actualSubstToStr(subs:Substitution): String {
+        return (0 until subs.begins.size).asSequence().filter { subs.levels[it] < Int.MAX_VALUE }.map {varNum ->
+            substToStr(varNum, subs.begins[varNum], subs.ends[varNum], subs.stmt)
         }.joinToString(separator = ", ")
     }
 
