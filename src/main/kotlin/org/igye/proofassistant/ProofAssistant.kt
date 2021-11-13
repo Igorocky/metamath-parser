@@ -47,7 +47,7 @@ object ProofAssistant {
         val grp = varGroups[currGrpIdx]
         val varNum = grp.asrtStmt[grp.varsBeginIdx + currVarIdx]
         val level = grp.level+currVarIdx
-        val maxSubExprLength = grp.exprEndIdx-grp.exprBeginIdx+1-(grp.numOfVars-currVarIdx-1)
+        val maxSubExprLength = grp.exprEndIdx-subExprBeginIdx+1-(grp.numOfVars-currVarIdx-1)
 
         fun invokeNext(subExprLength:Int) {
             if (currVarIdx < grp.numOfVars-1) {
@@ -94,7 +94,7 @@ object ProofAssistant {
             val existingSubExprBeginIdx = currSubs.begins[varNum]
             val existingSubLength = currSubs.ends[varNum]- existingSubExprBeginIdx +1
             if (existingSubLength <= maxSubExprLength
-                /*&& (currVarIdx < grp.numOfVars-1 || existingSubLength == maxSubExprLength)*/) {
+                && (currVarIdx < grp.numOfVars-1 || existingSubLength == maxSubExprLength)) {
                 var checkedLength = 0
                 while (checkedLength < existingSubLength
                     && stmt[existingSubExprBeginIdx+checkedLength] == stmt[subExprBeginIdx+checkedLength]) {
