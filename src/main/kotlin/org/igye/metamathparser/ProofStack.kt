@@ -2,6 +2,7 @@ package org.igye.metamathparser
 
 import org.igye.common.Utils.subList
 import org.igye.proofassistant.ProofAssistant
+import org.igye.proofassistant.Substitution
 
 class ProofStack {
     private var nodeCounter = 0;
@@ -145,13 +146,12 @@ class ProofStack {
         ProofAssistant.iterateSubstitutions(
             stmt = stmt,
             asrtStmt = asrtStmt,
-            numOfVariables = actualSubstitution.size
-        ) subsConsumer@{ subs: IntArray ->
-            for (i in 0 until actualSubstitution.size) {
-                if (varsPresentInAsrt[i] == 1
+        ) subsConsumer@{ subs: Substitution ->
+            for (varNum in 0 until actualSubstitution.size) {
+                if (varsPresentInAsrt[varNum] == 1
                     && !contentEquals(
-                        actualSubstitution[i],0,actualSubstitution[i].size-1,
-                        stmt, subs[i*2], subs[i*2+1]
+                        stmt1 = actualSubstitution[varNum], begin1 = 0, end1 = actualSubstitution[varNum].size-1,
+                        stmt2 = stmt, begin2 = subs.begins[varNum], end2 = subs.ends[varNum]
                     )
                 ) {
                     return@subsConsumer
