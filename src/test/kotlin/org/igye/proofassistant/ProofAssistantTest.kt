@@ -1,7 +1,21 @@
 package org.igye.proofassistant
 
 import org.junit.Assert.*
+import org.junit.Ignore
 import org.junit.Test
+
+object Symbols {
+    private val vars = setOf("a", "b", "c", "d", "e", "f", "g", "h", "ph", "ps", "ch", "$0", "$1", "$2", "$3", "$4")
+    private val consts = setOf("A", "B", "C", "D", "E", "F", "G", "H", "|-", "(", ")", "->", "=", "e.", "BaseSet", "`", "if", "U", "CPreHilOLD", ",", "<.", "+", "x.", ">.", "abs", "/\\", "+v", ".iOLD")
+    private val intToSymbol: Map<Int, String> = vars.asSequence().mapIndexed { i, s -> i to s }.toMap().plus(
+        consts.asSequence().mapIndexed { i, s -> -(i+1) to s }.toMap()
+    )
+    private val symbolToInt: Map<String, Int> = intToSymbol.asSequence().associate { (k,v) -> v to k }
+
+    fun stmtToArr(stmt: String): IntArray = stmt.split(" ").map { symbolToInt[it]!! }.toIntArray()
+    fun toInt(symb:String): Int = symbolToInt[symb]!!
+    fun toSymb(num:Int): String = intToSymbol[num]!!
+}
 
 internal class ProofAssistantTest {
     @Test
@@ -16,9 +30,9 @@ internal class ProofAssistantTest {
     @Test
     fun iterateMatchingConstParts_one_option() {
         testIterateMatchingConstParts(IterateMatchingConstPartsTestData(
-            asrtStmt = intArrayOf(a,ARR,b),
+            asrtStmt = "a -> b",
             expectedConstParts = "[[1,1]]",
-            stmt = intArrayOf(A,ARR,B),
+            stmt = "A -> B",
             expectedMatchingConstParts = setOf(
                 "[[1,1]]",
             )
@@ -28,9 +42,9 @@ internal class ProofAssistantTest {
     @Test
     fun iterateMatchingConstParts_two_options() {
         testIterateMatchingConstParts(IterateMatchingConstPartsTestData(
-            asrtStmt = intArrayOf(a,ARR,b),
+            asrtStmt = "a -> b",
             expectedConstParts = "[[1,1]]",
-            stmt = intArrayOf(A,ARR,B,ARR,C),
+            stmt = "A -> B -> C",
             expectedMatchingConstParts = setOf(
                 "[[1,1]]",
                 "[[3,3]]",
@@ -41,9 +55,9 @@ internal class ProofAssistantTest {
     @Test
     fun iterateMatchingConstParts_three_options() {
         testIterateMatchingConstParts(IterateMatchingConstPartsTestData(
-            asrtStmt = intArrayOf(a,ARR,b,ARR,c),
+            asrtStmt = "a -> b -> c",
             expectedConstParts = "[[1,1],[3,3]]",
-            stmt = intArrayOf(A,ARR,B,ARR,C,ARR,D),
+            stmt = "A -> B -> C -> D",
             expectedMatchingConstParts = setOf(
                 "[[1,1],[3,3]]",
                 "[[1,1],[5,5]]",
@@ -55,9 +69,9 @@ internal class ProofAssistantTest {
     @Test
     fun iterateMatchingConstParts_asrt_starts_with_constant() {
         testIterateMatchingConstParts(IterateMatchingConstPartsTestData(
-            asrtStmt = intArrayOf(PP,a,ARR,b),
+            asrtStmt = "|- a -> b",
             expectedConstParts = "[[0,0],[2,2]]",
-            stmt = intArrayOf(PP,A,ARR,B,ARR,C),
+            stmt = "|- A -> B -> C",
             expectedMatchingConstParts = setOf(
                 "[[0,0],[2,2]]",
                 "[[0,0],[4,4]]",
@@ -68,9 +82,9 @@ internal class ProofAssistantTest {
     @Test
     fun iterateMatchingConstParts_asrt_starts_with_constant_and_same_expression_is_present_inside_of_the_statement() {
         testIterateMatchingConstParts(IterateMatchingConstPartsTestData(
-            asrtStmt = intArrayOf(PP,a,ARR,b),
+            asrtStmt = "|- a -> b",
             expectedConstParts = "[[0,0],[2,2]]",
-            stmt = intArrayOf(PP,A,ARR,PP,B,ARR,C),
+            stmt = "|- A -> |- B -> C",
             expectedMatchingConstParts = setOf(
                 "[[0,0],[2,2]]",
                 "[[0,0],[5,5]]",
@@ -81,9 +95,9 @@ internal class ProofAssistantTest {
     @Test
     fun iterateMatchingConstParts_there_are_sequences_of_more_than_one_constant() {
         testIterateMatchingConstParts(IterateMatchingConstPartsTestData(
-            asrtStmt = intArrayOf(PP,BRO,a,ARR,b,BRC,ARR,BRO,a,ARR,b,BRC),
+            asrtStmt = "|- ( a -> b ) -> ( a -> b )",
             expectedConstParts = "[[0,1],[3,3],[5,7],[9,9],[11,11]]",
-            stmt = intArrayOf(PP,BRO,A,ARR,B,BRC,ARR,BRO,B,ARR,C,BRC),
+            stmt = "|- ( A -> B ) -> ( A -> B )",
             expectedMatchingConstParts = setOf(
                 "[[0,1],[3,3],[5,7],[9,9],[11,11]]",
             )
@@ -93,9 +107,9 @@ internal class ProofAssistantTest {
     @Test
     fun iterateMatchingConstParts_few_options_and_asrt_ends_with_constant() {
         testIterateMatchingConstParts(IterateMatchingConstPartsTestData(
-            asrtStmt = intArrayOf(a,ARR,b,ARR),
+            asrtStmt = "a -> b ->",
             expectedConstParts = "[[1,1],[3,3]]",
-            stmt = intArrayOf(A,ARR,B,ARR,C,ARR),
+            stmt = "A -> B -> C ->",
             expectedMatchingConstParts = setOf(
                 "[[1,1],[5,5]]",
                 "[[3,3],[5,5]]",
@@ -106,9 +120,9 @@ internal class ProofAssistantTest {
     @Test
     fun iterateMatchingConstParts_var_and_const() {
         testIterateMatchingConstParts(IterateMatchingConstPartsTestData(
-            asrtStmt = intArrayOf(a,ARR),
+            asrtStmt = "a ->",
             expectedConstParts = "[[1,1]]",
-            stmt = intArrayOf(A,ARR,B,ARR,C,ARR),
+            stmt = "A -> B -> C ->",
             expectedMatchingConstParts = setOf(
                 "[[5,5]]",
             )
@@ -118,9 +132,9 @@ internal class ProofAssistantTest {
     @Test
     fun iterateMatchingConstParts_gaps_between_some_constant_parts_are_less_than_number_of_variables_and_asrt_starts_with_constant() {
         testIterateMatchingConstParts(IterateMatchingConstPartsTestData(
-            asrtStmt = intArrayOf(PP,a,b,c,ARR,a,b,d),
+            asrtStmt = "|- a b c -> a b d",
             expectedConstParts = "[[0,0],[4,4]]",
-            stmt = intArrayOf(PP,A,B,C,ARR,A,B,D,ARR,C),
+            stmt = "|- A B C -> A B D -> C",
             expectedMatchingConstParts = setOf(
                 "[[0,0],[4,4]]",
             )
@@ -130,25 +144,25 @@ internal class ProofAssistantTest {
     @Test
     fun iterateMatchingConstParts_gaps_between_some_constant_parts_are_less_than_number_of_variables_and_asrt_starts_with_non_constant() {
         testIterateMatchingConstParts(IterateMatchingConstPartsTestData(
-            asrtStmt = intArrayOf(a,b,c,ARR,a,b,d),
+            asrtStmt = "a b c -> a b d",
             expectedConstParts = "[[3,3]]",
-            stmt = intArrayOf(A,ARR,B,ARR,C,D,E),
+            stmt = "A -> B -> C D E",
             expectedMatchingConstParts = setOf(
                 "[[3,3]]",
             )
         ))
 
         testIterateMatchingConstParts(IterateMatchingConstPartsTestData(
-            asrtStmt = intArrayOf(a,b,c,ARR,a,b,d),
+            asrtStmt = "a b c -> a b d",
             expectedConstParts = "[[3,3]]",
-            stmt = intArrayOf(A,ARR,B,C,D),
+            stmt = "A -> B C D",
             expectedMatchingConstParts = emptySet()
         ))
 
         testIterateMatchingConstParts(IterateMatchingConstPartsTestData(
-            asrtStmt = intArrayOf(BRO,a,b,BRC),
+            asrtStmt = "( a b )",
             expectedConstParts = "[[0,0],[3,3]]",
-            stmt = intArrayOf(BRO,A,BRC),
+            stmt = "( a )",
             expectedMatchingConstParts = emptySet()
         ))
     }
@@ -227,6 +241,7 @@ internal class ProofAssistantTest {
         ))
     }
 
+    @Ignore
     @Test
     fun iterateSubstitutions_case2_from_set_mm() {
         testIterateSubstitutions(IterateSubstitutionsTestData(
@@ -251,8 +266,8 @@ internal class ProofAssistantTest {
 
         //when
         ProofAssistant.iterateMatchingConstParts(
-            testData.stmt,
-            testData.asrtStmt
+            Symbols.stmtToArr(testData.stmt),
+            Symbols.stmtToArr(testData.asrtStmt)
         ) { constParts: List<IntArray>, matchingConstParts: Array<IntArray> ->
             //then
             assertEquals(testData.expectedConstParts, constPartsToStr(constParts.toTypedArray()))
@@ -267,16 +282,14 @@ internal class ProofAssistantTest {
         //given
         var cnt = 0
         val expectedSubsStr: Set<String> = testData.expectedSubstitutions.map { subst ->
-            subst.asSequence().sortedBy{symbolToInt[it.split(":")[0].trim()]!!}.joinToString(separator = ", ")
+            subst.asSequence().sortedBy{Symbols.toInt(it.split(":")[0].trim())!!}.joinToString(separator = ", ")
         }.toSet()
-        val stmt = testData.stmt.split(" ").map {
-            symbolToInt[it]!!
-        }.toIntArray()
+        val stmt = Symbols.stmtToArr(testData.stmt)
 
         //when
         ProofAssistant.iterateSubstitutions(
             stmt,
-            testData.asrtStmt.split(" ").map { symbolToInt[it]!! }.toIntArray()
+            Symbols.stmtToArr(testData.asrtStmt)
         ) { subs: Substitution ->
             //then
             val asrtStmtStr = testData.asrtStmt
@@ -296,9 +309,9 @@ internal class ProofAssistantTest {
 
     private fun substToStr(varNum:Int, stmtBegin:Int, stmtEnd:Int, stmt:IntArray): String {
         val sb = StringBuilder()
-        sb.append(intToSymbol[varNum]).append(":")
+        sb.append(Symbols.toSymb(varNum)).append(":")
         for (i in stmtBegin .. stmtEnd) {
-            sb.append(" ").append(intToSymbol[stmt[i]])
+            sb.append(" ").append(Symbols.toSymb(stmt[i]))
         }
         return sb.toString()
     }
@@ -307,90 +320,10 @@ internal class ProofAssistantTest {
         return "[" + constParts.asSequence().map { "[${it[0]},${it[1]}]" }.joinToString(separator = ",") + "]"
     }
 
-    private val A = -1
-    private val B = -2
-    private val C = -3
-    private val D = -4
-    private val E = -5
-    private val F = -6
-    private val G = -7
-    private val H = -8
-    private val PP = -9
-    private val BRO = -10
-    private val BRC = -11
-    private val ARR = -12
-    private val EQ = -13
-
-    private val a = 0
-    private val b = 1
-    private val c = 2
-    private val d = 3
-    private val e = 4
-    private val f = 5
-    private val g = 6
-    private val h = 7
-    private val ph = 8
-    private val ps = 9
-    private val ch = 10
-    private val var_0 = 11
-    private val var_1 = 12
-    private val var_2 = 13
-    private val var_3 = 14
-    private val var_4 = 15
-
-    private var constCnt = EQ-1
-    private val intToSymbol = mapOf(
-        A to "A",
-        B to "B",
-        C to "C",
-        D to "D",
-        E to "E",
-        F to "F",
-        G to "G",
-        H to "H",
-        PP to "|-",
-        BRO to "(",
-        BRC to ")",
-        ARR to "->",
-        EQ to "=",
-        constCnt-- to "e.",
-        constCnt-- to "BaseSet",
-        constCnt-- to "`",
-        constCnt-- to "if",
-        constCnt-- to "U",
-        constCnt-- to "CPreHilOLD",
-        constCnt-- to ",",
-        constCnt-- to "<.",
-        constCnt-- to "+",
-        constCnt-- to "x.",
-        constCnt-- to ">.",
-        constCnt-- to "abs",
-        constCnt-- to "/\\",
-        constCnt-- to "+v",
-        constCnt-- to ".iOLD",
-        a to "a",
-        b to "b",
-        c to "c",
-        d to "d",
-        e to "e",
-        f to "f",
-        g to "g",
-        h to "h",
-        ph to "ph",
-        ps to "ps",
-        ch to "ch",
-        var_0 to "$0",
-        var_1 to "$1",
-        var_2 to "$2",
-        var_3 to "$3",
-        var_4 to "$4",
-    )
-    private val symbolToInt: Map<String, Int> = intToSymbol.asSequence().associate { (k,v) -> v to k }
-
     data class IterateMatchingConstPartsTestData(
-        val asrtStmt: IntArray,
+        val asrtStmt: String,
         val expectedConstParts: String,
-        val stmt: IntArray,
+        val stmt: String,
         val expectedMatchingConstParts: Set<String>
     )
 
