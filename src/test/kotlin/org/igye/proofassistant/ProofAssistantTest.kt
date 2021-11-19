@@ -227,6 +227,24 @@ internal class ProofAssistantTest {
         ))
     }
 
+    @Test
+    fun iterateSubstitutions_case2_from_set_mm() {
+        testIterateSubstitutions(IterateSubstitutionsTestData(
+            asrtStmt = "|- ( $0 -> ( ( $1 -> $2 ) -> ( ( ( $3 -> $1 ) -> ( $2 -> $4 ) ) -> ( $1 -> $4 ) ) ) )",
+            stmt = "|- ( ( ( ( ph -> ps ) -> ( ph -> ps ) ) -> ( ( ( ( ( ph -> ps ) -> ch ) -> ( ph -> ps ) ) -> ( ( ph -> ps ) -> ( ph -> ps ) ) ) -> ( ( ph -> ps ) -> ( ph -> ps ) ) ) ) -> ( ( ( ( ( ph -> ps ) -> ( ph -> ps ) ) -> ( ( ( ( ( ph -> ps ) -> ch ) -> ( ph -> ps ) ) -> ( ( ph -> ps ) -> ( ph -> ps ) ) ) -> ( ( ph -> ps ) -> ( ph -> ps ) ) ) ) -> ( ( ( ph -> ps ) -> ( ph -> ps ) ) -> ( ( ( ( ( ph -> ps ) -> ch ) -> ( ph -> ps ) ) -> ( ( ph -> ps ) -> ( ph -> ps ) ) ) -> ( ( ph -> ps ) -> ( ph -> ps ) ) ) ) ) -> ( ( ( ( ( ( ph -> ps ) -> ( ph -> ps ) ) -> ( ( ( ( ( ph -> ps ) -> ch ) -> ( ph -> ps ) ) -> ( ( ph -> ps ) -> ( ph -> ps ) ) ) -> ( ( ph -> ps ) -> ( ph -> ps ) ) ) ) -> ( ( ( ph -> ps ) -> ( ph -> ps ) ) -> ( ( ( ( ( ph -> ps ) -> ch ) -> ( ph -> ps ) ) -> ( ( ph -> ps ) -> ( ph -> ps ) ) ) -> ( ( ph -> ps ) -> ( ph -> ps ) ) ) ) ) -> ( ( ( ( ph -> ps ) -> ( ph -> ps ) ) -> ( ( ( ( ( ph -> ps ) -> ch ) -> ( ph -> ps ) ) -> ( ( ph -> ps ) -> ( ph -> ps ) ) ) -> ( ( ph -> ps ) -> ( ph -> ps ) ) ) ) -> ( ( ( ph -> ps ) -> ( ph -> ps ) ) -> ( ( ( ( ( ph -> ps ) -> ch ) -> ( ph -> ps ) ) -> ( ( ph -> ps ) -> ( ph -> ps ) ) ) -> ( ( ph -> ps ) -> ( ph -> ps ) ) ) ) ) ) -> ( ( ( ( ph -> ps ) -> ( ph -> ps ) ) -> ( ( ( ( ( ph -> ps ) -> ch ) -> ( ph -> ps ) ) -> ( ( ph -> ps ) -> ( ph -> ps ) ) ) -> ( ( ph -> ps ) -> ( ph -> ps ) ) ) ) -> ( ( ( ph -> ps ) -> ( ph -> ps ) ) -> ( ( ( ( ( ph -> ps ) -> ch ) -> ( ph -> ps ) ) -> ( ( ph -> ps ) -> ( ph -> ps ) ) ) -> ( ( ph -> ps ) -> ( ph -> ps ) ) ) ) ) ) ) )",
+            expectedSubstitutions = listOf(
+                setOf(
+                    "a: A",
+                    "b: B",
+                    "c: C",
+                    "d: ( .iOLD ` if ( U e. CPreHilOLD , U , <. <. + , x. >. , abs >. ) )",
+                    "e: ( +v ` if ( U e. CPreHilOLD , U , <. <. + , x. >. , abs >. ) )",
+                    "f: ( BaseSet ` if ( U e. CPreHilOLD , U , <. <. + , x. >. , abs >. ) )"
+                ),
+            )
+        ))
+    }
+
     fun testIterateMatchingConstParts(testData: IterateMatchingConstPartsTestData) {
         //given
         var cnt = 0
@@ -311,8 +329,16 @@ internal class ProofAssistantTest {
     private val f = 5
     private val g = 6
     private val h = 7
+    private val ph = 8
+    private val ps = 9
+    private val ch = 10
+    private val var_0 = 11
+    private val var_1 = 12
+    private val var_2 = 13
+    private val var_3 = 14
+    private val var_4 = 15
 
-    private var constSnt = EQ-1
+    private var constCnt = EQ-1
     private val intToSymbol = mapOf(
         A to "A",
         B to "B",
@@ -327,21 +353,21 @@ internal class ProofAssistantTest {
         BRC to ")",
         ARR to "->",
         EQ to "=",
-        constSnt-- to "e.",
-        constSnt-- to "BaseSet",
-        constSnt-- to "`",
-        constSnt-- to "if",
-        constSnt-- to "U",
-        constSnt-- to "CPreHilOLD",
-        constSnt-- to ",",
-        constSnt-- to "<.",
-        constSnt-- to "+",
-        constSnt-- to "x.",
-        constSnt-- to ">.",
-        constSnt-- to "abs",
-        constSnt-- to "/\\",
-        constSnt-- to "+v",
-        constSnt-- to ".iOLD",
+        constCnt-- to "e.",
+        constCnt-- to "BaseSet",
+        constCnt-- to "`",
+        constCnt-- to "if",
+        constCnt-- to "U",
+        constCnt-- to "CPreHilOLD",
+        constCnt-- to ",",
+        constCnt-- to "<.",
+        constCnt-- to "+",
+        constCnt-- to "x.",
+        constCnt-- to ">.",
+        constCnt-- to "abs",
+        constCnt-- to "/\\",
+        constCnt-- to "+v",
+        constCnt-- to ".iOLD",
         a to "a",
         b to "b",
         c to "c",
@@ -350,6 +376,14 @@ internal class ProofAssistantTest {
         f to "f",
         g to "g",
         h to "h",
+        ph to "ph",
+        ps to "ps",
+        ch to "ch",
+        var_0 to "$0",
+        var_1 to "$1",
+        var_2 to "$2",
+        var_3 to "$3",
+        var_4 to "$4",
     )
     private val symbolToInt: Map<String, Int> = intToSymbol.asSequence().associate { (k,v) -> v to k }
 
