@@ -7,7 +7,7 @@ object Symbols {
         }
     }
 
-    private val vars = setOf("a", "b", "c", "d", "e", "f", "g", "h", "ph", "ps", "ch", "$0", "$1", "$2", "$3", "$4")
+    private val vars = setOf("a", "b", "c", "d", "e", "f", "g", "h", "ph", "ps", "ch", "th", "ta", "$0", "$1", "$2", "$3", "$4")
     private val consts = setOf("A", "B", "C", "D", "E", "F", "G", "H", "|-", "(", ")", "{", "}", "[", "]", "->", "=", "e.", "BaseSet", "`", "if", "U", "CPreHilOLD", ",", "<.", "+", "x.", ">.", "abs", "/\\", "+v", ".iOLD")
     init {
         if (vars.intersect(consts).isNotEmpty()) {

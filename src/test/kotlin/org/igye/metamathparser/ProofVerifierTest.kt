@@ -59,7 +59,7 @@ internal class ProofVerifierTest {
         //when
         val verifiedTheorems = assertions.values.asSequence()
             .filter { it.statement.type == 'p' }
-            .filter { it.statement.label == "dipdir" }
+            .filter { it.statement.label == "minimp-sylsimp" }
             .filter {
                 println("verifying ${it.statement.label}")
                 val res = ProofVerifier.verifyProof(it) != null
