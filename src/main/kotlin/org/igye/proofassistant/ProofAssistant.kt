@@ -17,7 +17,7 @@ object ProofAssistant {
         return ConstStackNode(Statement(type = 'n',content = intArrayOf()))
     }
 
-    fun iterateSubstitutions(stmt:IntArray, asrtStmt:IntArray, consumer: ((Substitution) -> Unit)) {
+    fun iterateSubstitutions(stmt:IntArray, asrtStmt:IntArray, parenCounter: () -> ParenthesesCounter, consumer: ((Substitution) -> Unit)) {
         val numOfVariables = asrtStmt.asSequence().filter { it >= 0 }.maxOrNull()!!+1
         iterateMatchingConstParts(stmt, asrtStmt) matchingConstPartsConsumer@{ constParts: List<IntArray>, matchingConstParts: Array<IntArray> ->
             val varGroups = createVarGroups(stmt, asrtStmt, constParts, matchingConstParts)
@@ -25,7 +25,8 @@ object ProofAssistant {
                 stmt = stmt,
                 begins = IntArray(numOfVariables),
                 ends = IntArray(numOfVariables),
-                levels = IntArray(numOfVariables){Int.MAX_VALUE}
+                levels = IntArray(numOfVariables){Int.MAX_VALUE},
+                parenthesesCounter = Array(numOfVariables){parenCounter()},
             )
             iterateSubstitutions(
                 currSubs = subs,
@@ -75,18 +76,25 @@ object ProofAssistant {
 
         if (currSubs.levels[varNum] >= level) {
             currSubs.levels[varNum] = level
+            currSubs.begins[varNum] = subExprBeginIdx
             if (currVarIdx == grp.numOfVars-1) {
-                currSubs.begins[varNum] = subExprBeginIdx
                 currSubs.ends[varNum] = grp.exprEndIdx
                 invokeNext(subExprLength = maxSubExprLength)
             } else {
-                currSubs.levels[varNum] = level
-                currSubs.begins[varNum] = subExprBeginIdx
+                val parenthesesCounter = currSubs.parenthesesCounter[varNum]
+                parenthesesCounter.reset()
                 var subExprLength = 1
+                var end = subExprBeginIdx
                 while (subExprLength <= maxSubExprLength) {
-                    currSubs.ends[varNum] = subExprBeginIdx+subExprLength-1
-                    invokeNext(subExprLength = subExprLength)
+                    currSubs.ends[varNum] = end
+                    val brStatus = parenthesesCounter.accept(stmt[end])
+                    if (brStatus == ParenthesesCounter.BR_OK) {
+                        invokeNext(subExprLength = subExprLength)
+                    } else if (brStatus == ParenthesesCounter.BR_FAILED) {
+                        break
+                    }
                     subExprLength++
+                    end++
                 }
             }
             currSubs.levels[varNum] = Int.MAX_VALUE

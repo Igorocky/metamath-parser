@@ -1,6 +1,7 @@
 package org.igye.metamathparser
 
 import org.igye.common.Utils.subList
+import org.igye.proofassistant.ParenthesesCounter
 import org.igye.proofassistant.ProofAssistant
 import org.igye.proofassistant.Substitution
 
@@ -146,6 +147,16 @@ class ProofStack {
         ProofAssistant.iterateSubstitutions(
             stmt = stmt,
             asrtStmt = asrtStmt,
+            parenCounter = {
+                ParenthesesCounter(
+                    roundBracketOpen = Int.MIN_VALUE,
+                    roundBracketClose = Int.MIN_VALUE,
+                    curlyBracketOpen = Int.MIN_VALUE,
+                    curlyBracketClose = Int.MIN_VALUE,
+                    squareBracketOpen = Int.MIN_VALUE,
+                    squareBracketClose = Int.MIN_VALUE,
+                )
+            }
         ) subsConsumer@{ subs: Substitution ->
             for (varNum in 0 until actualSubstitution.size) {
                 if (varsPresentInAsrt[varNum] == 1
