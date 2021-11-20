@@ -17,7 +17,7 @@ object ProofAssistant {
         return ConstStackNode(Statement(type = 'n',content = intArrayOf()))
     }
 
-    fun iterateSubstitutions(stmt:IntArray, asrtStmt:IntArray, parenCounter: () -> ParenthesesCounter, consumer: ((Substitution) -> Unit)) {
+    fun iterateSubstitutions(stmt:IntArray, asrtStmt:IntArray, parenCounterProducer: () -> ParenthesesCounter, consumer: ((Substitution) -> Unit)) {
         val numOfVariables = asrtStmt.asSequence().filter { it >= 0 }.maxOrNull()!!+1
         iterateMatchingConstParts(stmt, asrtStmt) matchingConstPartsConsumer@{ constParts: List<IntArray>, matchingConstParts: Array<IntArray> ->
             val varGroups = createVarGroups(stmt, asrtStmt, constParts, matchingConstParts)
@@ -26,7 +26,7 @@ object ProofAssistant {
                 begins = IntArray(numOfVariables),
                 ends = IntArray(numOfVariables),
                 levels = IntArray(numOfVariables){Int.MAX_VALUE},
-                parenthesesCounter = Array(numOfVariables){parenCounter()},
+                parenthesesCounter = Array(numOfVariables){parenCounterProducer()},
             )
             iterateSubstitutions(
                 currSubs = subs,
@@ -155,6 +155,156 @@ object ProofAssistant {
             level+=varGroup.numOfVars
         }
         return result
+    }
+
+    fun createConstParts(stmt: IntArray): ConstParts {
+        val constParts: MutableList<IntArray> = ArrayList()
+        for (i in stmt.indices) {
+            if (stmt[i] < 0) {
+                if (constParts.isEmpty() || constParts.last()[1] >= 0) {
+                    constParts.add(intArrayOf(i,-1))
+                }
+            } else if (constParts.isNotEmpty() && constParts.last()[1] < 0) {
+                constParts.last()[1] = i-1
+            }
+        }
+        if (constParts.isNotEmpty() && constParts.last()[1] < 0) {
+            constParts.last()[1] = stmt.size-1
+        }
+        val result = ConstParts(
+            begins = IntArray(constParts.size),
+            ends = IntArray(constParts.size),
+            parenCounters = emptyArray(),
+            remainingMinLength = Array(constParts.size){0},
+        )
+        var remainingMinLength = 0
+        for (i in constParts.indices.reversed()) {
+            result.begins[i] = constParts[i][0]
+            result.ends[i] = constParts[i][1]
+            remainingMinLength += (result.ends[i]-result.begins[i]+1) + lengthOfGap(
+                leftConstPartIdx = i,
+                constParts = constParts,
+                stmt.size
+            )
+            result.remainingMinLength[i] = remainingMinLength
+        }
+        return result
+    }
+
+    fun iterateMatchingConstParts(
+        stmt: IntArray,
+        asrtStmt: IntArray,
+        constParts: ConstParts,
+        matchingConstParts: ConstParts,
+        idxToMatch: Int,
+        consumer: (constParts: ConstParts, matchingConstParts: ConstParts) -> Unit
+    ) {
+        fun invokeNext() {
+            iterateMatchingConstParts(
+                stmt = stmt,
+                asrtStmt = asrtStmt,
+                constParts = constParts,
+                matchingConstParts = matchingConstParts,
+                idxToMatch = idxToMatch+1,
+                consumer = consumer,
+            )
+        }
+
+        if (idxToMatch == constParts.size) {
+            if (constParts.size > 0 && matchingConstParts.ends[idxToMatch-1] != stmt.size-1) {
+                if (constParts.ends[idxToMatch-1] == asrtStmt.size-1) {
+                    return
+                }
+                val matchingRemainingGap = stmt.size - matchingConstParts.ends[idxToMatch-1]
+                val remainingGap = asrtStmt.size - constParts.ends[idxToMatch-1]
+                if (remainingGap > matchingRemainingGap) {
+                    return
+                }
+                val parenCounter = matchingConstParts.parenCounters[idxToMatch]
+                parenCounter.reset()
+                var parenState = ParenthesesCounter.BR_OK
+                for (i in matchingConstParts.ends[idxToMatch-1]+1 .. stmt.size-1) {
+                    parenState = parenCounter.accept(stmt[i])
+                    if (parenState == ParenthesesCounter.BR_FAILED) {
+                        return
+                    }
+                }
+                if (parenState != ParenthesesCounter.BR_OK) {
+                    return
+                }
+            }
+            consumer(constParts, matchingConstParts)
+        } else {
+            if (idxToMatch == 0 && constParts.begins[idxToMatch] == 0) {
+                for (i in 0 .. constParts.ends[idxToMatch]) {
+                    if (asrtStmt[i] != stmt[i]) {
+                        return
+                    }
+                }
+                matchingConstParts.begins[idxToMatch]=0
+                matchingConstParts.ends[idxToMatch]=constParts.ends[idxToMatch]
+                invokeNext()
+            } else {
+                var begin = if (idxToMatch > 0) matchingConstParts.ends[idxToMatch-1]+1 else 0
+                val maxBegin = stmt.size - constParts.remainingMinLength[idxToMatch]
+                val parenCounter = matchingConstParts.parenCounters[idxToMatch]
+                parenCounter.reset()
+                var parenState = ParenthesesCounter.BR_OK
+                val numOfVars = if (idxToMatch > 0) {
+                    constParts.begins[idxToMatch] - constParts.ends[idxToMatch-1] - 1
+                } else {
+                    constParts.begins[0]
+                }
+                val partLen = constParts.ends[idxToMatch] - constParts.begins[idxToMatch] + 1
+                for (i in 1 .. numOfVars) {
+                    parenState = parenCounter.accept(stmt[begin])
+                    begin++
+                }
+                while (begin <= maxBegin && parenState != ParenthesesCounter.BR_FAILED) {
+                    if (parenState == ParenthesesCounter.BR_OK) {
+                        var matchedLen = 0
+                        while (matchedLen < partLen) {
+                            if (asrtStmt[constParts.begins[idxToMatch] + matchedLen] != stmt[begin + matchedLen]) {
+                                break
+                            }
+                            matchedLen++
+                        }
+                        if (matchedLen == partLen) {
+                            matchingConstParts.begins[idxToMatch]=begin
+                            matchingConstParts.ends[idxToMatch]=begin+partLen-1
+                            invokeNext()
+                        }
+                    }
+                    parenState = parenCounter.accept(stmt[begin])
+                    begin++
+                }
+            }
+
+        }
+    }
+
+    fun iterateMatchingConstParts2(
+        stmt: IntArray,
+        asrtStmt: IntArray,
+        parenCounterProducer: () -> ParenthesesCounter,
+        consumer: (constParts: ConstParts, matchingConstParts: ConstParts) -> Unit
+    ) {
+        // TODO: 10/23/2021 move constParts and matchingConstParts to Assertion
+        val constParts = createConstParts(asrtStmt)
+        val matchingConstParts = ConstParts(
+            begins = IntArray(constParts.begins.size),
+            ends = IntArray(constParts.begins.size),
+            parenCounters = Array(constParts.begins.size+1){parenCounterProducer()},
+            remainingMinLength = emptyArray()
+        )
+        iterateMatchingConstParts(
+            stmt = stmt,
+            asrtStmt = asrtStmt,
+            constParts = constParts,
+            matchingConstParts = matchingConstParts,
+            idxToMatch = 0,
+            consumer = consumer
+        )
     }
 
     fun iterateMatchingConstParts(

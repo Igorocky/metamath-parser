@@ -155,6 +155,18 @@ internal class ProofAssistantTest {
     }
 
     @Test
+    fun iterateMatchingConstParts_there_are_no_constants() {
+        testIterateMatchingConstParts(IterateMatchingConstPartsTestData(
+            asrtStmt = "a b",
+            expectedConstParts = "[]",
+            stmt = "A -> B",
+            expectedMatchingConstParts = setOf(
+                "[]",
+            )
+        ))
+    }
+
+    @Test
     fun iterateSubstitutions_one_option() {
         testIterateSubstitutions(IterateSubstitutionsTestData(
             asrtStmt = "|- a -> b",
@@ -183,6 +195,18 @@ internal class ProofAssistantTest {
             asrtStmt = "|- a -> b",
             stmt = "|- A = B",
             expectedSubstitutions = listOf()
+        ))
+    }
+
+    @Test
+    fun iterateSubstitutions_there_are_no_constants_in_assertion() {
+        testIterateSubstitutions(IterateSubstitutionsTestData(
+            asrtStmt = "a b",
+            stmt = "A = B",
+            expectedSubstitutions = listOf(
+                setOf("a: A", "b: = B"),
+                setOf("a: A =", "b: B"),
+            )
         ))
     }
 
@@ -253,12 +277,22 @@ internal class ProofAssistantTest {
         var cnt = 0
 
         //when
-        ProofAssistant.iterateMatchingConstParts(
+        ProofAssistant.iterateMatchingConstParts2(
             Symbols.stmtToArr(testData.stmt),
-            Symbols.stmtToArr(testData.asrtStmt)
-        ) { constParts: List<IntArray>, matchingConstParts: Array<IntArray> ->
+            Symbols.stmtToArr(testData.asrtStmt),
+            parenCounterProducer = {
+                ParenthesesCounter(
+                    roundBracketOpen = Symbols.toInt("("),
+                    roundBracketClose = Symbols.toInt(")"),
+                    curlyBracketOpen = Symbols.toInt("{"),
+                    curlyBracketClose = Symbols.toInt("}"),
+                    squareBracketOpen = Symbols.toInt("["),
+                    squareBracketClose = Symbols.toInt("]"),
+                )
+            }
+        ) { constParts: ConstParts, matchingConstParts: ConstParts ->
             //then
-            assertEquals(testData.expectedConstParts, constPartsToStr(constParts.toTypedArray()))
+            assertEquals(testData.expectedConstParts, constPartsToStr(constParts))
             val matchingConstPartsStr = constPartsToStr(matchingConstParts)
             assertTrue(testData.expectedMatchingConstParts.contains(matchingConstPartsStr))
             cnt++
@@ -278,7 +312,7 @@ internal class ProofAssistantTest {
         ProofAssistant.iterateSubstitutions(
             stmt = stmt,
             asrtStmt = Symbols.stmtToArr(testData.asrtStmt),
-            parenCounter = {
+            parenCounterProducer = {
                 ParenthesesCounter(
                     roundBracketOpen = Symbols.toInt("("),
                     roundBracketClose = Symbols.toInt(")"),
@@ -314,8 +348,12 @@ internal class ProofAssistantTest {
         return sb.toString()
     }
 
-    private fun constPartsToStr(constParts:Array<IntArray>): String {
-        return "[" + constParts.asSequence().map { "[${it[0]},${it[1]}]" }.joinToString(separator = ",") + "]"
+    private fun constPartsToStr(constParts:ConstParts): String {
+        return "[" +
+            (0..constParts.size-1).asSequence()
+            .map { "[${constParts.begins[it]},${constParts.ends[it]}]" }
+            .joinToString(separator = ",") +
+             "]"
     }
 
     data class IterateMatchingConstPartsTestData(

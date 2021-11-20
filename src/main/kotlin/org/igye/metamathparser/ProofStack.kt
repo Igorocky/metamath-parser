@@ -147,7 +147,7 @@ class ProofStack {
         ProofAssistant.iterateSubstitutions(
             stmt = stmt,
             asrtStmt = asrtStmt,
-            parenCounter = {
+            parenCounterProducer = {
                 ParenthesesCounter(
                     roundBracketOpen = Int.MIN_VALUE,
                     roundBracketClose = Int.MIN_VALUE,
