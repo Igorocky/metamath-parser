@@ -5,6 +5,8 @@ import org.igye.proofassistant.ParenthesesCounter
 import org.igye.proofassistant.ProofAssistant
 import org.igye.proofassistant.Substitution
 
+var parenCounterProducer: (() -> ParenthesesCounter)? = null
+
 class ProofStack {
     private var nodeCounter = 0;
     private val stack = ArrayList<StackNode>()
@@ -126,12 +128,12 @@ class ProofStack {
         actualSubstitution: ArrayList<IntArray>,
         visualizationData: VisualizationData
     ) {
-        println(
-            "validateSubstitution: " +
-                "asrtStmt=${numsToSymbols(asrtStmt, true, visualizationData)}; " +
-                "stmt=${numsToSymbols(stmt, false, visualizationData)}; " +
-                "${System.currentTimeMillis()}"
-        )
+//        println(
+//            "validateSubstitution: " +
+//                "asrtStmt=${numsToSymbols(asrtStmt, true, visualizationData)}; " +
+//                "stmt=${numsToSymbols(stmt, false, visualizationData)}; " +
+//                "${System.currentTimeMillis()}"
+//        )
         val varsPresentInAsrt = IntArray(actualSubstitution.size)
         var atLeastOneVarIsPresent = false
         for (i in 0 until asrtStmt.size) {
@@ -147,16 +149,7 @@ class ProofStack {
         ProofAssistant.iterateSubstitutions(
             stmt = stmt,
             asrtStmt = asrtStmt,
-            parenCounterProducer = {
-                ParenthesesCounter(
-                    roundBracketOpen = Int.MIN_VALUE,
-                    roundBracketClose = Int.MIN_VALUE,
-                    curlyBracketOpen = Int.MIN_VALUE,
-                    curlyBracketClose = Int.MIN_VALUE,
-                    squareBracketOpen = Int.MIN_VALUE,
-                    squareBracketClose = Int.MIN_VALUE,
-                )
-            }
+            parenCounterProducer = parenCounterProducer!!
         ) subsConsumer@{ subs: Substitution ->
             for (varNum in 0 until actualSubstitution.size) {
                 if (varsPresentInAsrt[varNum] == 1

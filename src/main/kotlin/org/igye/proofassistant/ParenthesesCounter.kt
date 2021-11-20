@@ -8,7 +8,7 @@ class ParenthesesCounter(
     private val squareBracketOpen:Int,
     private val squareBracketClose:Int,
 ) {
-    private val parenStack = IntArray(16)
+    private val parenStack = IntArray(30)
     private var stackIdx = -1
     private var failed = false
 
