@@ -1,10 +1,10 @@
-package org.igye.proofassistant
+package org.igye.proofassistant.substitutions
 
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-internal class ProofAssistantTest {
+internal class SubstitutionsTest {
 
     @Test
     fun iterateMatchingConstParts_one_option() {
@@ -266,7 +266,7 @@ internal class ProofAssistantTest {
         var cnt = 0
 
         //when
-        ProofAssistant.iterateMatchingConstParts(
+        Substitutions.iterateMatchingConstParts(
             Symbols.stmtToArr(testData.stmt),
             Symbols.stmtToArr(testData.asrtStmt),
             parenCounterProducer = {
@@ -298,7 +298,7 @@ internal class ProofAssistantTest {
         val stmt = Symbols.stmtToArr(testData.stmt)
 
         //when
-        ProofAssistant.iterateSubstitutions(
+        Substitutions.iterateSubstitutions(
             stmt = stmt,
             asrtStmt = Symbols.stmtToArr(testData.asrtStmt),
             parenCounterProducer = {
@@ -337,7 +337,7 @@ internal class ProofAssistantTest {
         return sb.toString()
     }
 
-    private fun constPartsToStr(constParts:ConstParts): String {
+    private fun constPartsToStr(constParts: ConstParts): String {
         return "[" +
             (0..constParts.size-1).asSequence()
             .map { "[${constParts.begins[it]},${constParts.ends[it]}]" }

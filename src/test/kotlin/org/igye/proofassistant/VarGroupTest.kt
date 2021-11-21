@@ -1,5 +1,6 @@
 package org.igye.proofassistant
 
+import org.igye.proofassistant.substitutions.VarGroup
 import org.junit.Assert.*
 import org.junit.Test
 

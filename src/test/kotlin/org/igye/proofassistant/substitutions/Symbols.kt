@@ -1,4 +1,4 @@
-package org.igye.proofassistant
+package org.igye.proofassistant.substitutions
 
 object Symbols {
     data class ConstPartsDto(val consts: String, val vars: String) {

@@ -1,7 +1,7 @@
 package org.igye.metamathparser
 
 import org.igye.common.Utils
-import org.igye.proofassistant.ParenthesesCounter
+import org.igye.proofassistant.substitutions.ParenthesesCounter
 import org.junit.Assert
 import org.junit.Test
 import java.io.File

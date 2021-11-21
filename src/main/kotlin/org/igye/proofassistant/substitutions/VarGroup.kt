@@ -1,4 +1,4 @@
-package org.igye.proofassistant
+package org.igye.proofassistant.substitutions
 
 // TODO: 11/5/2021 move VarGroup to Assertion.proofAssistantData
 class VarGroup(

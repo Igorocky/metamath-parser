@@ -1,4 +1,4 @@
-package org.igye.proofassistant
+package org.igye.proofassistant.substitutions
 
 class Substitution(
     var stmt: IntArray,

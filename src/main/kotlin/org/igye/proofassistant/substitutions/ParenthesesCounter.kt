@@ -1,4 +1,4 @@
-package org.igye.proofassistant
+package org.igye.proofassistant.substitutions
 
 class ParenthesesCounter(
     private val roundBracketOpen:Int,

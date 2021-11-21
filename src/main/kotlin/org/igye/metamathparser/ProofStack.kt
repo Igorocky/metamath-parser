@@ -1,9 +1,9 @@
 package org.igye.metamathparser
 
 import org.igye.common.Utils.subList
-import org.igye.proofassistant.ParenthesesCounter
-import org.igye.proofassistant.ProofAssistant
-import org.igye.proofassistant.Substitution
+import org.igye.proofassistant.substitutions.ParenthesesCounter
+import org.igye.proofassistant.substitutions.Substitution
+import org.igye.proofassistant.substitutions.Substitutions
 
 var parenCounterProducer: (() -> ParenthesesCounter)? = null
 
@@ -146,7 +146,7 @@ class ProofStack {
             return
         }
         var matchFound = false
-        ProofAssistant.iterateSubstitutions(
+        Substitutions.iterateSubstitutions(
             stmt = stmt,
             asrtStmt = asrtStmt,
             parenCounterProducer = parenCounterProducer!!
