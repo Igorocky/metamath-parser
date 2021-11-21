@@ -44,12 +44,14 @@ object ProofAssistant {
 
         while (statementsToProve.isNotEmpty() && !result.isProved) {
             val currStmt = statementsToProve.removeLast()
-            for (foundProof in findProof(stmt = currStmt, ctx = ctx)) {
-                currStmt.proofs.add(foundProof)
-                if (foundProof is CalculatedProofNode) {
-                    statementsToProve.addAll(foundProof.args)
+            if (!currStmt.isProved) {
+                for (foundProof in findProof(stmt = currStmt, ctx = ctx)) {
+                    currStmt.proofs.add(foundProof)
+                    if (foundProof is CalculatedProofNode) {
+                        statementsToProve.addAll(foundProof.args)
+                    }
+                    markProved(foundProof)
                 }
-                markProved(foundProof)
             }
         }
 
@@ -61,23 +63,19 @@ object ProofAssistant {
     }
 
     fun markProved(proofNode: ProofNode) {
-        var node: VarProofNode? = if (proofNode is ConstProofNode) {
+        var toBeMarkedAsProved: VarProofNode? = if (proofNode is ConstProofNode) {
             proofNode.provesWhat
         } else if (proofNode is CalculatedProofNode && proofNode.args.isEmpty()) {
             proofNode.result
         } else {
             null
         }
-        while (node != null) {
-            if (node is VarProofNode) {
-                node.isProved = true
-                if (node.argOf != null) {
-                    val calcNode = node.argOf!!
-                    if (calcNode.args.all { it.isProved }) {
-                        node = calcNode.result
-                    } else {
-                        break
-                    }
+        while (toBeMarkedAsProved != null && !toBeMarkedAsProved.isProved) {
+            toBeMarkedAsProved.isProved = true
+            if (toBeMarkedAsProved.argOf != null) {
+                val calcNode = toBeMarkedAsProved.argOf!!
+                if (calcNode.args.all { it.isProved }) {
+                    toBeMarkedAsProved = calcNode.result
                 } else {
                     break
                 }
@@ -108,7 +106,7 @@ object ProofAssistant {
                 asrtStmt = assertion.statement.content,
                 parenCounterProducer = ctx.parentheses!!::createParenthesesCounter
             ) { subs ->
-                if (subs.begins.size == assertion.numberOfVariables && subs.isDefined.filter { !it }.isEmpty()) {
+                if (subs.begins.size == assertion.numberOfVariables && subs.isDefined.all { it }) {
                     val subsList = ArrayList<IntArray>(subs.begins.size)
                     for (i in subs.begins.indices) {
                         subsList.add(subs.stmt.copyOfRange(fromIndex = subs.begins[i], toIndex = subs.ends[i]+1))
