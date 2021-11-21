@@ -1,5 +1,7 @@
 package org.igye.metamathparser
 
+import org.igye.common.ContinueInstr
+
 class MetamathContext(
     private val parent:MetamathContext? = null,
 ):MetamathContextI<MetamathContext> {
@@ -15,6 +17,8 @@ class MetamathContext(
     private val assertions:MutableMap<String,Assertion>? = if (parent == null) HashMap() else null
 
     private var lastCommentP: String? = null
+
+    var parentheses: MetamathParentheses? = null
 
     override fun createChildContext(): MetamathContext {
         return MetamathContext(parent = this)
@@ -43,18 +47,27 @@ class MetamathContext(
         return hypotheses?.get(name)?:parent?.getHypothesis(name)
     }
 
-    fun getHypotheses(filter:(Statement) -> Boolean):List<Statement> {
-        val result = ArrayList<Statement>()
+    fun iterateHypotheses(consumer: (Statement) -> ContinueInstr) {
         var ctx: MetamathContext? = this
         while (ctx != null) {
             if (ctx.hypotheses != null) {
-                for (hypothesis in ctx.hypotheses!!.values) {
-                    if (filter(hypothesis)) {
-                        result.add(hypothesis)
+                for (hyp in ctx.hypotheses!!.values) {
+                    if (consumer(hyp) == ContinueInstr.STOP) {
+                        return
                     }
                 }
             }
             ctx = ctx.parent
+        }
+    }
+
+    fun getHypotheses(filter:(Statement) -> Boolean):List<Statement> {
+        val result = ArrayList<Statement>()
+        iterateHypotheses {
+            if (filter(it)) {
+                result.add(it)
+            }
+            ContinueInstr.CONTINUE
         }
         return result
     }

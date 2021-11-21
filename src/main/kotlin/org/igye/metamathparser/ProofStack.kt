@@ -1,5 +1,7 @@
 package org.igye.metamathparser
 
+import org.igye.common.ContinueInstr
+import org.igye.common.MetamathUtils.applySubstitution
 import org.igye.common.Utils.subList
 import org.igye.proofassistant.substitutions.ParenthesesCounter
 import org.igye.proofassistant.substitutions.Substitution
@@ -78,32 +80,6 @@ class ProofStack {
         stack.add(node)
     }
 
-    fun applySubstitution(value:IntArray, substitution: List<IntArray>): IntArray {
-        var resultSize = 0
-        for (i in value) {
-            if (i < 0) {
-                resultSize++
-            } else {
-                resultSize += substitution[i].size
-            }
-        }
-        val res = IntArray(resultSize)
-        var s = 0
-        var t = 0
-        while (s < value.size) {
-            if (value[s] < 0) {
-                res[t] = value[s]
-                t++
-            } else {
-                val newExpr: IntArray = substitution[value[s]]
-                newExpr.copyInto(destination = res, destinationOffset = t)
-                t += newExpr.size
-            }
-            s++
-        }
-        return res
-    }
-
     private fun numsToSymbols(
         stmt: IntArray,
         isAssertion: Boolean,
@@ -158,10 +134,11 @@ class ProofStack {
                         stmt2 = stmt, begin2 = subs.begins[varNum], end2 = subs.ends[varNum]
                     )
                 ) {
-                    return@subsConsumer
+                    return@subsConsumer ContinueInstr.CONTINUE
                 }
             }
             matchFound = true
+            return@subsConsumer ContinueInstr.STOP
         }
         if (!matchFound) {
             throw MetamathParserException("!matchFound")

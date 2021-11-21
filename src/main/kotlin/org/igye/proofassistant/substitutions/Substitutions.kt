@@ -1,10 +1,12 @@
 package org.igye.proofassistant.substitutions
 
+import org.igye.common.ContinueInstr
+import org.igye.common.ContinueInstr.CONTINUE
 import java.util.*
 
 object Substitutions {
 
-    fun iterateSubstitutions(stmt:IntArray, asrtStmt:IntArray, parenCounterProducer: () -> ParenthesesCounter, consumer: ((Substitution) -> Unit)) {
+    fun iterateSubstitutions(stmt:IntArray, asrtStmt:IntArray, parenCounterProducer: () -> ParenthesesCounter, consumer: ((Substitution) -> ContinueInstr)) {
         val maxVarNumberOrNull = asrtStmt.asSequence().filter { it >= 0 }.maxOrNull()
         if (maxVarNumberOrNull == null) {
             if (asrtStmt.contentEquals(stmt)) {
@@ -48,17 +50,16 @@ object Substitutions {
     private fun iterateSubstitutions(
         currSubs:Substitution,
         varGroups:List<VarGroup>, currGrpIdx:Int, currVarIdx:Int, subExprBeginIdx:Int,
-        consumer: ((Substitution) -> Unit)
-    ) {
+        consumer: ((Substitution) -> ContinueInstr)
+    ):ContinueInstr {
         val stmt = currSubs.stmt
         val grp = varGroups[currGrpIdx]
         val varNum = grp.asrtStmt[grp.varsBeginIdx + currVarIdx]
-        val level = grp.level+currVarIdx
         val maxSubExprLength = grp.exprEndIdx-subExprBeginIdx+1-(grp.numOfVars-currVarIdx-1)
 
-        fun invokeNext(subExprLength:Int) {
+        fun invokeNext(subExprLength:Int):ContinueInstr {
             if (currVarIdx < grp.numOfVars-1) {
-                iterateSubstitutions(
+                return iterateSubstitutions(
                     currSubs = currSubs,
                     varGroups = varGroups,
                     currGrpIdx = currGrpIdx,
@@ -67,7 +68,7 @@ object Substitutions {
                     consumer = consumer
                 )
             } else if (currGrpIdx < varGroups.size-1) {
-                iterateSubstitutions(
+                return iterateSubstitutions(
                     currSubs = currSubs,
                     varGroups = varGroups,
                     currGrpIdx = currGrpIdx+1,
@@ -76,26 +77,27 @@ object Substitutions {
                     consumer = consumer
                 )
             } else {
-                consumer(currSubs)
+                return consumer(currSubs)
             }
         }
 
+        var continueInstr = CONTINUE
         if (!currSubs.isDefined[varNum]) {
             currSubs.isDefined[varNum] = true
             currSubs.begins[varNum] = subExprBeginIdx
             if (currVarIdx == grp.numOfVars-1) {
                 currSubs.ends[varNum] = grp.exprEndIdx
-                invokeNext(subExprLength = maxSubExprLength)
+                continueInstr = invokeNext(subExprLength = maxSubExprLength)
             } else {
                 val parenthesesCounter = currSubs.parenthesesCounter[varNum]
                 parenthesesCounter.reset()
                 var subExprLength = 1
                 var end = subExprBeginIdx
-                while (subExprLength <= maxSubExprLength) {
+                while (subExprLength <= maxSubExprLength && continueInstr == CONTINUE) {
                     currSubs.ends[varNum] = end
                     val brStatus = parenthesesCounter.accept(stmt[end])
                     if (brStatus == ParenthesesCounter.BR_OK) {
-                        invokeNext(subExprLength = subExprLength)
+                        continueInstr = invokeNext(subExprLength = subExprLength)
                     } else if (brStatus == ParenthesesCounter.BR_FAILED) {
                         break
                     }
@@ -115,10 +117,11 @@ object Substitutions {
                     checkedLength++
                 }
                 if (checkedLength == existingSubLength) {
-                    invokeNext(subExprLength = checkedLength)
+                    continueInstr = invokeNext(subExprLength = checkedLength)
                 }
             }
         }
+        return continueInstr
     }
 
     private fun createVarGroups(stmt:IntArray, asrtStmt:IntArray, constParts: ConstParts, matchingConstParts: ConstParts):List<VarGroup> {
@@ -219,10 +222,10 @@ object Substitutions {
         constParts: ConstParts,
         matchingConstParts: ConstParts,
         idxToMatch: Int,
-        consumer: (constParts: ConstParts, matchingConstParts: ConstParts) -> Unit
-    ) {
-        fun invokeNext() {
-            iterateMatchingConstParts(
+        consumer: (constParts: ConstParts, matchingConstParts: ConstParts) -> ContinueInstr
+    ):ContinueInstr {
+        fun invokeNext():ContinueInstr {
+            return iterateMatchingConstParts(
                 stmt = stmt,
                 asrtStmt = asrtStmt,
                 constParts = constParts,
@@ -235,12 +238,12 @@ object Substitutions {
         if (idxToMatch == constParts.size) {
             if (constParts.size > 0 && matchingConstParts.ends[idxToMatch-1] != stmt.size-1) {
                 if (constParts.ends[idxToMatch-1] == asrtStmt.size-1) {
-                    return
+                    return CONTINUE
                 }
                 val matchingRemainingGap = stmt.size - matchingConstParts.ends[idxToMatch-1]
                 val remainingGap = asrtStmt.size - constParts.ends[idxToMatch-1]
                 if (remainingGap > matchingRemainingGap) {
-                    return
+                    return CONTINUE
                 }
                 val parenCounter = matchingConstParts.parenCounters[idxToMatch]
                 parenCounter.reset()
@@ -248,24 +251,24 @@ object Substitutions {
                 for (i in matchingConstParts.ends[idxToMatch-1]+1 .. stmt.size-1) {
                     parenState = parenCounter.accept(stmt[i])
                     if (parenState == ParenthesesCounter.BR_FAILED) {
-                        return
+                        return CONTINUE
                     }
                 }
                 if (parenState != ParenthesesCounter.BR_OK) {
-                    return
+                    return CONTINUE
                 }
             }
-            consumer(constParts, matchingConstParts)
+            return consumer(constParts, matchingConstParts)
         } else {
             if (idxToMatch == 0 && constParts.begins[idxToMatch] == 0) {
                 for (i in 0 .. constParts.ends[idxToMatch]) {
                     if (asrtStmt[i] != stmt[i]) {
-                        return
+                        return CONTINUE
                     }
                 }
                 matchingConstParts.begins[idxToMatch]=0
                 matchingConstParts.ends[idxToMatch]=constParts.ends[idxToMatch]
-                invokeNext()
+                return invokeNext()
             } else {
                 var begin = if (idxToMatch > 0) matchingConstParts.ends[idxToMatch-1]+1 else 0
                 val maxBegin = stmt.size - constParts.remainingMinLength[idxToMatch]
@@ -282,7 +285,8 @@ object Substitutions {
                     parenState = parenCounter.accept(stmt[begin])
                     begin++
                 }
-                while (begin <= maxBegin && parenState != ParenthesesCounter.BR_FAILED) {
+                var continueInstr = CONTINUE
+                while (begin <= maxBegin && parenState != ParenthesesCounter.BR_FAILED && continueInstr == CONTINUE) {
                     if (parenState == ParenthesesCounter.BR_OK) {
                         var matchedLen = 0
                         while (matchedLen < partLen) {
@@ -294,14 +298,14 @@ object Substitutions {
                         if (matchedLen == partLen) {
                             matchingConstParts.begins[idxToMatch]=begin
                             matchingConstParts.ends[idxToMatch]=begin+partLen-1
-                            invokeNext()
+                            continueInstr = invokeNext()
                         }
                     }
                     parenState = parenCounter.accept(stmt[begin])
                     begin++
                 }
+                return continueInstr
             }
-
         }
     }
 
@@ -309,7 +313,7 @@ object Substitutions {
         stmt: IntArray,
         asrtStmt: IntArray,
         parenCounterProducer: () -> ParenthesesCounter,
-        consumer: (constParts: ConstParts, matchingConstParts: ConstParts) -> Unit
+        consumer: (constParts: ConstParts, matchingConstParts: ConstParts) -> ContinueInstr
     ) {
         // TODO: 10/23/2021 move constParts and matchingConstParts to Assertion
         val constParts = createConstParts(asrtStmt)

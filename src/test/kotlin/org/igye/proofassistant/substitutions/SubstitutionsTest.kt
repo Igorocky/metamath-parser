@@ -1,5 +1,6 @@
 package org.igye.proofassistant.substitutions
 
+import org.igye.common.ContinueInstr
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -305,6 +306,7 @@ internal class SubstitutionsTest {
             val matchingConstPartsStr = constPartsToStr(matchingConstParts)
             assertTrue(testData.expectedMatchingConstParts.contains(matchingConstPartsStr))
             cnt++
+            ContinueInstr.CONTINUE
         }
         assertEquals(testData.expectedMatchingConstParts.size,cnt)
     }
@@ -313,7 +315,7 @@ internal class SubstitutionsTest {
         //given
         var cnt = 0
         val expectedSubsStr: Set<String> = testData.expectedSubstitutions.map { subst ->
-            subst.asSequence().sortedBy{Symbols.toInt(it.split(":")[0].trim())!!}.joinToString(separator = ", ")
+            subst.asSequence().sortedBy{Symbols.toInt(it.split(":")[0].trim())}.joinToString(separator = ", ")
         }.toSet()
         val stmt = Symbols.stmtToArr(testData.stmt)
 
@@ -338,6 +340,7 @@ internal class SubstitutionsTest {
             val actualSubsStr = actualSubstToStr(subs)
             assertTrue(expectedSubsStr.contains(actualSubsStr))
             cnt++
+            ContinueInstr.CONTINUE
         }
         assertEquals(testData.expectedSubstitutions.size,cnt)
     }
