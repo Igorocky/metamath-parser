@@ -1,5 +1,6 @@
 package org.igye.metamathparser
 
+import java.io.File
 import java.util.*
 import kotlin.collections.ArrayList
 import kotlin.math.min
@@ -30,6 +31,14 @@ data class SequenceOfSymbols(
 data class LabeledSequenceOfSymbols(val label:String, val sequence:SequenceOfSymbols, val beginIdx:Int): Expression
 
 object Parsers {
+
+    fun parseMetamathFile(file: File):MetamathContext {
+        return parseMetamathFile(
+            text = File("C:\\igye\\books\\metamath/set.mm").readText(),
+            rootContext = MetamathContext(),
+            exprProc = ExpressionProcessor
+        )
+    }
 
     fun <C:MetamathContextI<C>> parseMetamathFile(text:String, rootContext: C, exprProc: (C, Expression) -> Unit):C {
         val (_, code: List<NonComment>) = extractComments(text)

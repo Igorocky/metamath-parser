@@ -203,6 +203,26 @@ internal class SubstitutionsTest {
     }
 
     @Test
+    fun iterateSubstitutions_there_are_no_variables_in_assertion_and_assertion_matches_the_statement() {
+        testIterateSubstitutions(IterateSubstitutionsTestData(
+            asrtStmt = "A = B",
+            stmt = "A = B",
+            expectedSubstitutions = listOf(
+                setOf()
+            )
+        ))
+    }
+
+    @Test
+    fun iterateSubstitutions_there_are_no_variables_in_assertion_and_assertion_doesnt_match_the_statement() {
+        testIterateSubstitutions(IterateSubstitutionsTestData(
+            asrtStmt = "A -> B",
+            stmt = "A = B",
+            expectedSubstitutions = listOf()
+        ))
+    }
+
+    @Test
     fun iterateSubstitutions_one_variable_repeats() {
         testIterateSubstitutions(IterateSubstitutionsTestData(
             asrtStmt = "|- a -> b",
@@ -323,7 +343,7 @@ internal class SubstitutionsTest {
     }
 
     private fun actualSubstToStr(subs:Substitution): String {
-        return (0 until subs.begins.size).asSequence().filter { subs.levels[it] < Int.MAX_VALUE }.map {varNum ->
+        return (0 until subs.begins.size).asSequence().filter { subs.isDefined[it] }.map { varNum ->
             substToStr(varNum, subs.begins[varNum], subs.ends[varNum], subs.stmt)
         }.joinToString(separator = ", ")
     }

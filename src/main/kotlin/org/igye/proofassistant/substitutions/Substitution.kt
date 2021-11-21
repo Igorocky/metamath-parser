@@ -4,6 +4,6 @@ class Substitution(
     var stmt: IntArray,
     val begins: IntArray,
     val ends: IntArray,
-    val levels: IntArray,
+    val isDefined: BooleanArray,
     val parenthesesCounter: Array<ParenthesesCounter>,
 )

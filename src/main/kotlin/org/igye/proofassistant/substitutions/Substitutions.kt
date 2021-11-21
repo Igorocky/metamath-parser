@@ -5,28 +5,43 @@ import java.util.*
 object Substitutions {
 
     fun iterateSubstitutions(stmt:IntArray, asrtStmt:IntArray, parenCounterProducer: () -> ParenthesesCounter, consumer: ((Substitution) -> Unit)) {
-        val numOfVariables = asrtStmt.asSequence().filter { it >= 0 }.maxOrNull()!!+1
-        iterateMatchingConstParts(
-            stmt = stmt,
-            asrtStmt = asrtStmt,
-            parenCounterProducer = parenCounterProducer,
-        ) { constParts: ConstParts, matchingConstParts: ConstParts ->
-            val varGroups = createVarGroups(stmt, asrtStmt, constParts, matchingConstParts)
-            val subs = Substitution(
+        val maxVarNumberOrNull = asrtStmt.asSequence().filter { it >= 0 }.maxOrNull()
+        if (maxVarNumberOrNull == null) {
+            if (asrtStmt.contentEquals(stmt)) {
+                consumer(
+                    Substitution(
+                        stmt = stmt,
+                        begins = IntArray(0),
+                        ends = IntArray(0),
+                        isDefined = BooleanArray(0),
+                        parenthesesCounter = emptyArray(),
+                    )
+                )
+            }
+        } else {
+            val numOfVariables = maxVarNumberOrNull+1
+            iterateMatchingConstParts(
                 stmt = stmt,
-                begins = IntArray(numOfVariables),
-                ends = IntArray(numOfVariables),
-                levels = IntArray(numOfVariables){Int.MAX_VALUE},
-                parenthesesCounter = Array(numOfVariables){parenCounterProducer()},
-            )
-            iterateSubstitutions(
-                currSubs = subs,
-                varGroups = varGroups,
-                currGrpIdx = 0,
-                currVarIdx = 0,
-                subExprBeginIdx = varGroups[0].exprBeginIdx,
-                consumer = consumer
-            )
+                asrtStmt = asrtStmt,
+                parenCounterProducer = parenCounterProducer,
+            ) { constParts: ConstParts, matchingConstParts: ConstParts ->
+                val varGroups = createVarGroups(stmt, asrtStmt, constParts, matchingConstParts)
+                val subs = Substitution(
+                    stmt = stmt,
+                    begins = IntArray(numOfVariables),
+                    ends = IntArray(numOfVariables),
+                    isDefined = BooleanArray(numOfVariables){false},
+                    parenthesesCounter = Array(numOfVariables){parenCounterProducer()},
+                )
+                iterateSubstitutions(
+                    currSubs = subs,
+                    varGroups = varGroups,
+                    currGrpIdx = 0,
+                    currVarIdx = 0,
+                    subExprBeginIdx = varGroups[0].exprBeginIdx,
+                    consumer = consumer
+                )
+            }
         }
     }
 
@@ -65,8 +80,8 @@ object Substitutions {
             }
         }
 
-        if (currSubs.levels[varNum] >= level) {
-            currSubs.levels[varNum] = level
+        if (!currSubs.isDefined[varNum]) {
+            currSubs.isDefined[varNum] = true
             currSubs.begins[varNum] = subExprBeginIdx
             if (currVarIdx == grp.numOfVars-1) {
                 currSubs.ends[varNum] = grp.exprEndIdx
@@ -88,7 +103,7 @@ object Substitutions {
                     end++
                 }
             }
-            currSubs.levels[varNum] = Int.MAX_VALUE
+            currSubs.isDefined[varNum] = false
         } else {
             val existingSubExprBeginIdx = currSubs.begins[varNum]
             val existingSubLength = currSubs.ends[varNum]- existingSubExprBeginIdx +1
