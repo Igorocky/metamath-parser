@@ -1,9 +1,65 @@
 package org.igye.common
 
+import com.fasterxml.jackson.annotation.JsonInclude
+import com.fasterxml.jackson.databind.ObjectMapper
+import com.fasterxml.jackson.databind.SerializationFeature
 import org.igye.metamathparser.Assertion
 import org.igye.metamathparser.MetamathContext
+import org.igye.proofassistant.proof.*
 
 object MetamathUtils {
+    private val MAPPER = ObjectMapper()
+    init {
+        MAPPER.setSerializationInclusion(JsonInclude.Include.NON_NULL)
+        MAPPER.configure(SerializationFeature.ORDER_MAP_ENTRIES_BY_KEYS, true)
+    }
+
+    fun toJson(obj: Any): String {
+        return MAPPER.writeValueAsString(obj)
+    }
+
+    fun toJson(node: ProofNode): String {
+        return MAPPER.writeValueAsString(toDto(node))
+    }
+
+    fun toDto(node: ProofNode): ProofNodeDto {
+        return when (node) {
+            is ConstProofNode -> toDto(node)
+            is VarProofNode -> toDto(node)
+            is CalculatedProofNode -> toDto(node)
+            else -> ProofNodeDto(
+                u = "Unexpected type of proof node: ${node.javaClass.canonicalName}",
+                proofLength = node.proofLength,
+                isCanceled = node.isCanceled
+            )
+        }
+    }
+
+    fun toDto(node: ConstProofNode): ProofNodeDto {
+        return ProofNodeDto(
+            f = node.valueStr,
+            proofLength = node.proofLength,
+            isCanceled = node.isCanceled,
+        )
+    }
+
+    fun toDto(node: VarProofNode): ProofNodeDto {
+        return ProofNodeDto(
+            v = node.valueStr,
+            proofLength = node.proofLength,
+            isCanceled = node.isCanceled,
+            proofs = node.proofs.map { toDto(it) }
+        )
+    }
+
+    fun toDto(node: CalculatedProofNode): ProofNodeDto {
+        return ProofNodeDto(
+            a = node.valueStr,
+            proofLength = node.proofLength,
+            isCanceled = node.isCanceled,
+            args = node.args.map { toDto(it) }
+        )
+    }
 
     fun toString(stmt: IntArray, ctx: MetamathContext):String {
         return stmt.asSequence().map(ctx::getSymbolByNumber).joinToString(separator = " ")

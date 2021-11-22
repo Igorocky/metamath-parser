@@ -2,6 +2,7 @@ package org.igye.proofassistant
 
 import org.igye.common.ContinueInstr.CONTINUE
 import org.igye.common.MetamathUtils.applySubstitution
+import org.igye.common.MetamathUtils.toJson
 import org.igye.common.MetamathUtils.toString
 import org.igye.metamathparser.MetamathContext
 import org.igye.metamathparser.MetamathParentheses
@@ -15,7 +16,7 @@ fun main() {
     val ctx = parseMetamathFile(File("C:\\igye\\books\\metamath/set.mm"))
     val p1 = ProofAssistant.prove("wff ( y e. NN -> y e. CC )", ctx)
 
-    println("done")
+    println("p1 = ${toJson(p1)}")
 }
 
 object ProofAssistant {
@@ -42,45 +43,96 @@ object ProofAssistant {
         val statementsToProve = ArrayList<VarProofNode>()
         statementsToProve.add(result)
 
-        while (statementsToProve.isNotEmpty() && !result.isProved) {
+        while (statementsToProve.isNotEmpty() && result.proofLength < 0) {
             val currStmt = statementsToProve.removeLast()
-            if (!currStmt.isProved) {
-                for (foundProof in findProof(stmt = currStmt, ctx = ctx)) {
+            if (currStmt.proofLength < 0 && !currStmt.isCanceled) {
+                val foundProofs = findProof(stmt = currStmt, ctx = ctx)
+                for (foundProof in foundProofs) {
                     currStmt.proofs.add(foundProof)
                     if (foundProof is CalculatedProofNode) {
                         statementsToProve.addAll(foundProof.args)
                     }
+                }
+                for (foundProof in foundProofs) {
                     markProved(foundProof)
                 }
             }
         }
 
-        if (!result.isProved) {
-            throw ProofAssistantException("!result.isProved")
+        if (result.proofLength < 0) {
+            println("-----------------------------")
+            println(toJson(result))
+            println("-----------------------------")
+            throw ProofAssistantException("result.proveLength < 0")
         }
 
         return result
     }
 
     fun markProved(proofNode: ProofNode) {
+        if (proofNode.proofLength >= 0 || proofNode.isCanceled) {
+            return
+        }
         var toBeMarkedAsProved: VarProofNode? = if (proofNode is ConstProofNode) {
+            proofNode.proofLength = 0
             proofNode.provesWhat
         } else if (proofNode is CalculatedProofNode && proofNode.args.isEmpty()) {
+            proofNode.proofLength = 0
             proofNode.result
         } else {
             null
         }
-        while (toBeMarkedAsProved != null && !toBeMarkedAsProved.isProved) {
-            toBeMarkedAsProved.isProved = true
+        var proofLength = 1
+        while (toBeMarkedAsProved != null) {
+            if (toBeMarkedAsProved.proofLength >= 0) {
+                throw ProofAssistantException("toBeMarkedAsProved.proofLength >= 0")
+            }
+            toBeMarkedAsProved.proofLength = proofLength
             if (toBeMarkedAsProved.argOf != null) {
                 val calcNode = toBeMarkedAsProved.argOf!!
-                if (calcNode.args.all { it.isProved }) {
+                if (calcNode.args.all { it.proofLength >= 0 }) {
+                    calcNode.proofLength = calcNode.args.asSequence().map { it.proofLength+1 }.sum()
                     toBeMarkedAsProved = calcNode.result
+                    proofLength = calcNode.proofLength+1
                 } else {
                     break
                 }
             } else {
                 break
+            }
+        }
+        if (toBeMarkedAsProved != null) {
+            cancelNotProved(toBeMarkedAsProved)
+        }
+    }
+
+    fun cancelNotProved(provedNode: VarProofNode) {
+        val rootsToStartCancellingFrom = ArrayList<VarProofNode>()
+        rootsToStartCancellingFrom.add(provedNode)
+        while (rootsToStartCancellingFrom.isNotEmpty()) {
+            val currProvedNode = rootsToStartCancellingFrom.removeLast()
+            val nodesToCancel = ArrayList<ProofNode>()
+            val proofToRemain = currProvedNode.proofs.asSequence().filter { it.proofLength >= 0 }.minByOrNull { it.proofLength }!!
+            for (proof in currProvedNode.proofs) {
+                if (proof != proofToRemain) {
+                    nodesToCancel.add(proof)
+                }
+            }
+            currProvedNode.proofs.removeIf{ it != proofToRemain }
+            while (nodesToCancel.isNotEmpty()) {
+                val currNode = nodesToCancel.removeLast()
+                currNode.isCanceled = true
+                if (currNode is VarProofNode) {
+                    nodesToCancel.addAll(currNode.proofs)
+                } else if (currNode is CalculatedProofNode) {
+                    nodesToCancel.addAll(currNode.args)
+                }
+            }
+
+            if (proofToRemain is VarProofNode) {
+                rootsToStartCancellingFrom.add(proofToRemain)
+            } else if (proofToRemain is CalculatedProofNode) {
+                rootsToStartCancellingFrom.addAll(proofToRemain.args)
             }
         }
     }
