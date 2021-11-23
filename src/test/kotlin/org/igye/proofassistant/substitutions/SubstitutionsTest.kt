@@ -1,9 +1,11 @@
 package org.igye.proofassistant.substitutions
 
 import org.igye.common.ContinueInstr
+import org.igye.metamathparser.*
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import java.io.File
 
 internal class SubstitutionsTest {
 
@@ -280,6 +282,54 @@ internal class SubstitutionsTest {
                 ),
             )
         ))
+    }
+
+    @Test
+    fun iterateSubstitutions_finds_all_substitution_in_set_mm() {
+        //given
+        val assertions: Map<String, Assertion> =
+            Parsers.parseMetamathFile(
+                text = File("C:\\igye\\books\\metamath/set.mm").readText(), rootContext = MetamathContext(), exprProc = ExpressionProcessor
+            ).getAssertions()
+
+        var parentheses = HashMap<String,Int>()
+        for ((_,a) in assertions) {
+            for((i,s) in a.visualizationData.symbolsMap) {
+                if ("(" == s || ")" == s || "{" == s || "}" == s || "[" == s || "]" == s) {
+                    parentheses[s]=i
+                }
+            }
+        }
+        parenCounterProducer = {
+            ParenthesesCounter(
+                roundBracketOpen = parentheses["("]!!,
+                roundBracketClose = parentheses[")"]!!,
+                curlyBracketOpen = parentheses["{"]!!,
+                curlyBracketClose = parentheses["}"]!!,
+                squareBracketOpen = parentheses["["]!!,
+                squareBracketClose = parentheses["]"]!!,
+            )
+        }
+
+        val theorems = assertions.asSequence()
+            .filter { it.value.statement.type == 'p' }
+            .associate { it.key to it.value }
+
+        //when
+        var cnt = 0
+        theorems.values.asSequence()
+            .filter {
+                println("verifying ${it.statement.label}")
+                val res = ProofVerifier.verifyProof(it) != null
+                cnt++
+                println("${cnt*1.0/theorems.size*100}%")
+                res
+            }
+            .map { it.statement.label }
+            .toList()
+
+        //then
+        assertEquals(theorems.size, cnt)
     }
 
     fun testIterateMatchingConstParts(testData: IterateMatchingConstPartsTestData) {

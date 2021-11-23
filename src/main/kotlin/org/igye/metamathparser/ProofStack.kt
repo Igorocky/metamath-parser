@@ -104,6 +104,9 @@ class ProofStack {
         actualSubstitution: ArrayList<IntArray>,
         visualizationData: VisualizationData
     ) {
+        if (parenCounterProducer == null) {
+            return
+        }
 //        println(
 //            "validateSubstitution: " +
 //                "asrtStmt=${numsToSymbols(asrtStmt, true, visualizationData)}; " +

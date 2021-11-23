@@ -47,59 +47,24 @@ internal class ProofVerifierTest {
     @Test
     fun successfully_verifies_all_compressed_valid_proofs() {
         //given
-//        val assertions: Map<String, Assertion> =
-//            Parsers.parseMetamathFile(
-//                text = Utils.readStringFromClassPath("/set-reduced.mm"), rootContext = MetamathContext(), exprProc = ExpressionProcessor
-//            ).getAssertions()
-
         val assertions: Map<String, Assertion> =
             Parsers.parseMetamathFile(
-                text = File("C:\\igye\\books\\metamath/set.mm").readText(), rootContext = MetamathContext(), exprProc = ExpressionProcessor
+                text = Utils.readStringFromClassPath("/set-reduced.mm"), rootContext = MetamathContext(), exprProc = ExpressionProcessor
             ).getAssertions()
-
-        var parentheses = HashMap<String,Int>()
-        for ((_,a) in assertions) {
-            for((i,s) in a.visualizationData.symbolsMap) {
-                if ("(" == s || ")" == s || "{" == s || "}" == s || "[" == s || "]" == s) {
-                    parentheses[s]=i
-                }
-            }
-        }
-        parenCounterProducer = {
-            ParenthesesCounter(
-                roundBracketOpen = parentheses["("]!!,
-                roundBracketClose = parentheses[")"]!!,
-                curlyBracketOpen = parentheses["{"]!!,
-                curlyBracketClose = parentheses["}"]!!,
-                squareBracketOpen = parentheses["["]!!,
-                squareBracketClose = parentheses["]"]!!,
-            )
-        }
-
-        val theorems = assertions.asSequence()
-            .filter { it.value.statement.type == 'p' }
-            .associate { it.key to it.value }
 
         //when
         var cnt = 0.0
-        val verifiedTheorems = theorems.values.asSequence()
-//            .filter { it.statement.label == "minimp-sylsimp" }
-            .filter {
-                println("verifying ${it.statement.label}")
-                val res = ProofVerifier.verifyProof(it) != null
-                cnt++
-                println("${cnt/theorems.size*100}%")
-                res
-            }
+        val verifiedTheorems = assertions.values.asSequence()
+            .filter { it.statement.type == 'p' }
+            .filter { ProofVerifier.verifyProof(it) != null }
             .map { it.statement.label }
             .toList()
 
         //then
-//        Assert.assertEquals(
-//            listOf("pm2.5","pm2.6","pm2.86i","pm2.61iii","syl8","com35","syl9","com34","syl6","syl7","4syl","pm2.521","jad","pm2.43","imim2","con4i","syl9r","imim1","pm2.18d","3syld","con4d","impbidd","syl5","impt","pm2.86d","peirce","com25","com24","a1iiOLD","com23","sylsyld","impi","mpii","con3d","imim12","con3i","pm2.61","com3r","imim12i","mt3d","mt3i","pm2.65","syli","com4r","a1dd","com4l","pm2.52","pm2.65i","pm2.51","com45","syld","impbid21d","mt2d","sylc","mt2i","imim12d","a1d","id1","mpsyl","a1i","pm2.65d","com3l","imim3i","pm2.86","pm2.83","mth8","bijust","a2d","syl5d","a2i","syl6com","mt4d","idd","idi","mt4i","syl6d","dfbi1","pm2.61d2","syl6c","pm2.61d1","con1","com15","com14","com13","com12","imim1d","syl","mpcom","bi1","bi3","impbid","con2d","impbii","con2","con2i","con3","pm2.61d","imim2i","imim2d","pm2.21ddOLD","pm2.61i","mp2","con1d","mp2OLD","con1i","imim1i","syl5com","pm2.21dd","syl6mpi","mp1i","id","mpd","pm3.2im","mpi","pm2.24ii","dummylink","simprim","ja","jc","a1ii","pm2.61nii","syl2im","syldd","dfbi1ALT","loowoz","mpdd","pm2.24d","mpdi","syl3c","loolin","pm2.24i","mp2b","mp2d","syl56","com52r","mt2","mt4","mt3","com52l","pm2.01d","embantd","jarl","jarr","nsyld","pm2.04","pm2.01","syl6ci","mtod","nsyli","notnotrd","notnotri","pm2.43i","notnoti","com4t","mto","3syl","nsyl","pm2.43a","com5r","simplim","pm2.43b","mpisyl","pm2.43d","looinv","com5l","expi","pm2.27","mpid","pm2.24","pm2.21","pm2.18","nsyl4","expt","nsyl2","nsyl3","pm2.86iALT","pm2.21i","sylcom","syl10","pm2.61ii","mtoi","con3rr3","pm2.21d","notnot1","notnot2"
-//            ),
-//            verifiedTheorems
-//        )
+        Assert.assertEquals(
+            listOf("pm2.5","pm2.6","pm2.86i","pm2.61iii","syl8","com35","syl9","com34","syl6","syl7","4syl","pm2.521","jad","pm2.43","imim2","con4i","syl9r","imim1","pm2.18d","3syld","con4d","impbidd","syl5","impt","pm2.86d","peirce","com25","com24","a1iiOLD","com23","sylsyld","impi","mpii","con3d","imim12","con3i","pm2.61","com3r","imim12i","mt3d","mt3i","pm2.65","syli","com4r","a1dd","com4l","pm2.52","pm2.65i","pm2.51","com45","syld","impbid21d","mt2d","sylc","mt2i","imim12d","a1d","id1","mpsyl","a1i","pm2.65d","com3l","imim3i","pm2.86","pm2.83","mth8","bijust","a2d","syl5d","a2i","syl6com","mt4d","idd","idi","mt4i","syl6d","dfbi1","pm2.61d2","syl6c","pm2.61d1","con1","com15","com14","com13","com12","imim1d","syl","mpcom","bi1","bi3","impbid","con2d","impbii","con2","con2i","con3","pm2.61d","imim2i","imim2d","pm2.21ddOLD","pm2.61i","mp2","con1d","mp2OLD","con1i","imim1i","syl5com","pm2.21dd","syl6mpi","mp1i","id","mpd","pm3.2im","mpi","pm2.24ii","dummylink","simprim","ja","jc","a1ii","pm2.61nii","syl2im","syldd","dfbi1ALT","loowoz","mpdd","pm2.24d","mpdi","syl3c","loolin","pm2.24i","mp2b","mp2d","syl56","com52r","mt2","mt4","mt3","com52l","pm2.01d","embantd","jarl","jarr","nsyld","pm2.04","pm2.01","syl6ci","mtod","nsyli","notnotrd","notnotri","pm2.43i","notnoti","com4t","mto","3syl","nsyl","pm2.43a","com5r","simplim","pm2.43b","mpisyl","pm2.43d","looinv","com5l","expi","pm2.27","mpid","pm2.24","pm2.21","pm2.18","nsyl4","expt","nsyl2","nsyl3","pm2.86iALT","pm2.21i","sylcom","syl10","pm2.61ii","mtoi","con3rr3","pm2.21d","notnot1","notnot2"),
+            verifiedTheorems
+        )
     }
 
     @Test
