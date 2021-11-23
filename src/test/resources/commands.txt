@@ -1,0 +1,3 @@
+./metamath.exe "read set-mod.mm" "verify proof new-asrt" exit
+
+./metamath.exe "read set-mod.mm" "show proof new-asrt /all" exit

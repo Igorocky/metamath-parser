@@ -5,6 +5,8 @@ import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.databind.SerializationFeature
 import org.igye.metamathparser.Assertion
 import org.igye.metamathparser.MetamathContext
+import org.igye.metamathparser.MetamathParserException
+import org.igye.metamathparser.Statement
 import org.igye.proofassistant.proof.*
 
 object MetamathUtils {
@@ -96,5 +98,48 @@ object MetamathUtils {
             s++
         }
         return res
+    }
+
+    fun collectFloatingHypotheses(variables:Set<Int>, ctx: MetamathContext): Pair<List<Statement>, HashMap<Int, Int>> {
+        val variablesTypes = HashMap<Int,Int>()
+        val floatingHypotheses = ctx.getHypotheses {
+            when (it.type) {
+                'f' -> {
+                    val varNum = it.content[1]
+                    if (variables.contains(varNum)) {
+                        if (variablesTypes.containsKey(varNum)) {
+                            throw MetamathParserException("variablesTypes.containsKey(varName)")
+                        } else {
+                            variablesTypes[varNum] = it.content[0]
+                            true
+                        }
+                    } else {
+                        false
+                    }
+                }
+                else -> false
+            }
+        }
+        if (variablesTypes.keys != variables) {
+            throw MetamathParserException("types.keys != variables")
+        }
+        return Pair(floatingHypotheses, variablesTypes)
+    }
+
+    fun collectAllVariables(essentialHypotheses: List<Statement>, assertionStatement: IntArray):Set<Int> {
+        val variables = HashSet<Int>()
+        for (hypothesis in essentialHypotheses) {
+            for (i in hypothesis.content) {
+                if (i >= 0) {
+                    variables.add(i)
+                }
+            }
+        }
+        for (i in assertionStatement) {
+            if (i >= 0) {
+                variables.add(i)
+            }
+        }
+        return variables
     }
 }

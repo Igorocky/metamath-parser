@@ -1,16 +1,20 @@
 package org.igye.proofassistant
 
 import org.igye.common.ContinueInstr.CONTINUE
+import org.igye.common.MetamathUtils
 import org.igye.common.MetamathUtils.applySubstitution
+import org.igye.common.MetamathUtils.collectAllVariables
 import org.igye.common.MetamathUtils.toJson
 import org.igye.common.MetamathUtils.toString
 import org.igye.metamathparser.MetamathContext
 import org.igye.metamathparser.MetamathParentheses
 import org.igye.metamathparser.MetamathParserException
 import org.igye.metamathparser.Parsers.parseMetamathFile
+import org.igye.metamathparser.Statement
 import org.igye.proofassistant.proof.*
 import org.igye.proofassistant.substitutions.Substitutions
 import java.io.File
+import java.util.*
 
 fun main() {
     val ctx = parseMetamathFile(File("C:\\igye\\books\\metamath/set.mm"))
@@ -20,6 +24,51 @@ fun main() {
 }
 
 object ProofAssistant {
+
+    fun createProvableAssertion(varProofNode: VarProofNode, ctx: MetamathContext): String {
+        val essentialHypotheses: List<Statement> = ctx.getHypotheses { it.type == 'e'}
+        val variables = collectAllVariables(essentialHypotheses, varProofNode.value)
+        val (floatingHypotheses, variablesTypes) = MetamathUtils.collectFloatingHypotheses(variables, ctx)
+        val mandatoryHypotheses: List<Statement> = (floatingHypotheses + essentialHypotheses).sortedBy { it.beginIdx }
+
+        val proofLabels: MutableList<String> = ArrayList(mandatoryHypotheses.map { it.label })
+        val labelToIdx = HashMap<String,Int>()
+        for (i in proofLabels.indices) {
+            labelToIdx[proofLabels[i]] = i
+        }
+
+        fun labelToInt(label:String): Int {
+            if (!labelToIdx.containsKey(label)) {
+                labelToIdx[label] = proofLabels.size
+                proofLabels.add(label)
+            }
+            return labelToIdx[label]!! + 1
+        }
+
+        val proofStepsStack = Stack<Int>()
+        val nodesToProcess = Stack<VarProofNode>()
+        nodesToProcess.push(varProofNode)
+        while (nodesToProcess.isNotEmpty()) {
+            val curNodeProof = nodesToProcess.pop().proofs[0]
+            if (curNodeProof is CalculatedProofNode) {
+                proofStepsStack.push(labelToInt(curNodeProof.assertion.statement.label))
+                curNodeProof.args.forEach { nodesToProcess.push(it) }
+            } else if (curNodeProof is ConstProofNode) {
+                proofStepsStack.push(labelToInt(curNodeProof.stmt.label))
+            } else {
+                throw ProofAssistantException("Unexpected type of curNodeProof: " + curNodeProof.javaClass.canonicalName)
+            }
+        }
+
+        val proofSteps = ArrayList<Int>()
+        while (proofStepsStack.isNotEmpty()) {
+            proofSteps.add(proofStepsStack.pop())
+        }
+
+        return "\$p " + varProofNode.value.asSequence().map { ctx.getSymbolByNumber(it) }.joinToString(" ") +
+                " $= ( " + proofLabels.drop(mandatoryHypotheses.size).joinToString(" ") + " ) " +
+                proofSteps.asSequence().map { intToStr(it) }.joinToString("") + " $."
+    }
 
     fun prove(expr: String, ctx: MetamathContext): VarProofNode {
         val allowedStatementsTypes: Set<Int> = setOf("wff", "setvar", "class").map { ctx.getNumberBySymbol(it) }.toSet()
@@ -69,7 +118,25 @@ object ProofAssistant {
         return result
     }
 
-    fun markProved(proofNode: ProofNode) {
+    private fun intToStr(i: Int): String {
+        if (i == 0) {
+            throw ProofAssistantException("i == 0")
+        }
+        var i = i
+        val sb = StringBuilder()
+        var base = 21
+        //65 is A, 85 is U
+        while (i > 0) {
+            sb.append((i % base + if (sb.length == 0) 64 else 85).toChar())
+            i /= base
+            if (base == 21) {
+                base = 6
+            }
+        }
+        return sb.reverse().toString()
+    }
+
+    private fun markProved(proofNode: ProofNode) {
         if (proofNode.proofLength >= 0 || proofNode.isCanceled) {
             return
         }
@@ -106,7 +173,7 @@ object ProofAssistant {
         }
     }
 
-    fun cancelNotProved(provedNode: VarProofNode) {
+    private fun cancelNotProved(provedNode: VarProofNode) {
         val rootsToStartCancellingFrom = ArrayList<VarProofNode>()
         rootsToStartCancellingFrom.add(provedNode)
         while (rootsToStartCancellingFrom.isNotEmpty()) {
@@ -137,10 +204,10 @@ object ProofAssistant {
         }
     }
 
-    fun findProof(stmt: VarProofNode, ctx: MetamathContext): List<ProofNode> {
+    private fun findProof(stmt: VarProofNode, ctx: MetamathContext): List<ProofNode> {
         val result = ArrayList<ProofNode>()
         ctx.iterateHypotheses { hyp->
-            if (hyp.type == 'f' && hyp.content.contentEquals(stmt.value)) {
+            if ((hyp.type == 'f' || hyp.type == 'e') && hyp.content.contentEquals(stmt.value)) {
                 result.add(
                     ConstProofNode(
                         stmt = hyp,
@@ -185,7 +252,7 @@ object ProofAssistant {
         return result
     }
 
-    fun mkStmt(str:String, symbToInt:(String) -> Int): IntArray {
+    private fun mkStmt(str:String, symbToInt:(String) -> Int): IntArray {
         return str.trim().split(' ').asSequence()
             .map(symbToInt)
             .toList()

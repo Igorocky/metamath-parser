@@ -1,5 +1,8 @@
 package org.igye.metamathparser
 
+import org.igye.common.MetamathUtils.collectAllVariables
+import org.igye.common.MetamathUtils.collectFloatingHypotheses
+
 object ExpressionProcessor: ((MetamathContext,Expression) -> Unit) {
     override fun invoke(ctx: MetamathContext, expr: Expression) {
         when (expr) {
@@ -64,29 +67,8 @@ object ExpressionProcessor: ((MetamathContext,Expression) -> Unit) {
             type = expr.sequence.seqType,
             content = symbolsToNumbers(ctx, expr.sequence.symbols)
         )
-        val variables = collectAllVariables(essentialHypotheses, assertionStatement)
-        val variablesTypes = HashMap<Int,Int>()
-        val floatingHypotheses = ctx.getHypotheses {
-            when (it.type) {
-                'f' -> {
-                    val varNum = it.content[1]
-                    if (variables.contains(varNum)) {
-                        if (variablesTypes.containsKey(varNum)) {
-                            throw MetamathParserException("variablesTypes.containsKey(varName)")
-                        } else {
-                            variablesTypes[varNum] = it.content[0]
-                            true
-                        }
-                    } else {
-                        false
-                    }
-                }
-                else -> false
-            }
-        }
-        if (variablesTypes.keys != variables) {
-            throw MetamathParserException("types.keys != variables")
-        }
+        val variables = collectAllVariables(essentialHypotheses, assertionStatement.content)
+        val (floatingHypotheses, variablesTypes) = collectFloatingHypotheses(variables, ctx)
         val mandatoryHypotheses: List<Statement> = (floatingHypotheses + essentialHypotheses).sortedBy { it.beginIdx }
         val assertionsReferencedFromProof: List<Any> = getAssertionsReferencedFromProof(
             ctx = ctx,
@@ -188,23 +170,6 @@ object ExpressionProcessor: ((MetamathContext,Expression) -> Unit) {
         } else {
             return emptyList()
         }
-    }
-
-    private fun collectAllVariables(essentialHypotheses: List<Statement>, assertionStatement: Statement):Set<Int> {
-        val variables = HashSet<Int>()
-        for (hypothesis in essentialHypotheses) {
-            for (i in hypothesis.content) {
-                if (i >= 0) {
-                    variables.add(i)
-                }
-            }
-        }
-        for (i in assertionStatement.content) {
-            if (i >= 0) {
-                variables.add(i)
-            }
-        }
-        return variables
     }
 
     private fun symbolsToNumbers(ctx: MetamathContext, symbols: List<String>): IntArray {
