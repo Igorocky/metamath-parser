@@ -15,6 +15,8 @@ import org.igye.proofassistant.proof.*
 import org.igye.proofassistant.substitutions.Substitutions
 import java.io.File
 import java.util.*
+import kotlin.collections.HashMap
+import kotlin.random.Random
 
 fun main() {
     val ctx = parseMetamathFile(File("C:\\igye\\books\\metamath/set.mm"))
@@ -25,7 +27,7 @@ fun main() {
 
 object ProofAssistant {
 
-    fun createProvableAssertion(varProofNode: VarProofNode, ctx: MetamathContext): String {
+    fun createProvableAssertion(varProofNode: InstVarProofNode, ctx: MetamathContext): String {
         val essentialHypotheses: List<Statement> = ctx.getHypotheses { it.type == 'e'}
         val variables = collectAllVariables(essentialHypotheses, varProofNode.value)
         val (floatingHypotheses, variablesTypes) = MetamathUtils.collectFloatingHypotheses(variables, ctx)
@@ -46,7 +48,7 @@ object ProofAssistant {
         }
 
         val proofStepsStack = Stack<Int>()
-        val nodesToProcess = Stack<VarProofNode>()
+        val nodesToProcess = Stack<InstVarProofNode>()
         nodesToProcess.push(varProofNode)
         while (nodesToProcess.isNotEmpty()) {
             val curNodeProof = nodesToProcess.pop().proofs[0]
@@ -70,13 +72,10 @@ object ProofAssistant {
                 proofSteps.asSequence().map { intToStr(it) }.joinToString("") + " $."
     }
 
-    fun prove(expr: String, ctx: MetamathContext): VarProofNode {
+    fun prove(expr: String, ctx: MetamathContext): InstVarProofNode {
         val allowedStatementsTypes: Set<Int> = setOf("wff", "setvar", "class").map { ctx.getNumberBySymbol(it) }.toSet()
-        val result = VarProofNode(
-            value = mkStmt(expr, ctx::getNumberBySymbol),
-            valueStr = expr
-        )
-        if (!allowedStatementsTypes.contains(result.value[0])) {
+        val result = InstVarProofNode(stmt = mkStmt(expr, ctx))
+        if (!allowedStatementsTypes.contains(result.stmt.value[0])) {
             throw MetamathParserException("!allowedStatementsTypes.contains(result.value[0])")
         }
 
@@ -89,22 +88,28 @@ object ProofAssistant {
             squareBracketClose = ctx.getNumberBySymbol("]"),
         )
 
-        val statementsToProve = ArrayList<VarProofNode>()
-        statementsToProve.add(result)
+        val statementsToProve = HashMap<Stmt,InstVarProofNode>()
+        statementsToProve[result.stmt] = result
+        val provedStatements = HashMap<Stmt,InstVarProofNode>()
 
-        while (statementsToProve.isNotEmpty() && result.proofLength < 0) {
-            val currStmt = statementsToProve.removeLast()
-            if (currStmt.proofLength < 0 && !currStmt.isCanceled) {
-                val foundProofs = findProof(stmt = currStmt, ctx = ctx)
-                for (foundProof in foundProofs) {
-                    currStmt.proofs.add(foundProof)
-                    if (foundProof is CalculatedProofNode) {
-                        statementsToProve.addAll(foundProof.args)
-                    }
+        while (result.proofLength < 0 && statementsToProve.isNotEmpty()) {
+            val currStmt: InstVarProofNode = statementsToProve.iterator().next().value
+            statementsToProve.remove(currStmt.stmt)
+            val proof: InstVarProofNode? = provedStatements[currStmt.stmt]
+            if (proof != null) {
+                val ref = RefVarProofNode(stmt = currStmt.stmt, ref = proof, argOf = currStmt.argOf)
+            } else {
+
+            }
+            val foundProofs = findProof(stmt = currStmt, ctx = ctx)
+            for (foundProof in foundProofs) {
+                currStmt.proofs.add(foundProof)
+                if (foundProof is CalculatedProofNode) {
+                    statementsToProve.addAll(foundProof.args)
                 }
-                for (foundProof in foundProofs) {
-                    markProved(foundProof)
-                }
+            }
+            for (foundProof in foundProofs) {
+                markProved(foundProof)
             }
         }
 
@@ -116,6 +121,10 @@ object ProofAssistant {
         }
 
         return result
+    }
+
+    private fun replaceInstWithRef(inst: InstVarProofNode, ref: RefVarProofNode) {
+
     }
 
     private fun intToStr(i: Int): String {
@@ -140,7 +149,7 @@ object ProofAssistant {
         if (proofNode.proofLength >= 0 || proofNode.isCanceled) {
             return
         }
-        var toBeMarkedAsProved: VarProofNode? = if (proofNode is ConstProofNode) {
+        var toBeMarkedAsProved: InstVarProofNode? = if (proofNode is ConstProofNode) {
             proofNode.proofLength = 0
             proofNode.provesWhat
         } else if (proofNode is CalculatedProofNode && proofNode.args.isEmpty()) {
@@ -173,8 +182,8 @@ object ProofAssistant {
         }
     }
 
-    private fun cancelNotProved(provedNode: VarProofNode) {
-        val rootsToStartCancellingFrom = ArrayList<VarProofNode>()
+    private fun cancelNotProved(provedNode: InstVarProofNode) {
+        val rootsToStartCancellingFrom = ArrayList<InstVarProofNode>()
         rootsToStartCancellingFrom.add(provedNode)
         while (rootsToStartCancellingFrom.isNotEmpty()) {
             val currProvedNode = rootsToStartCancellingFrom.removeLast()
@@ -189,14 +198,14 @@ object ProofAssistant {
             while (nodesToCancel.isNotEmpty()) {
                 val currNode = nodesToCancel.removeLast()
                 currNode.isCanceled = true
-                if (currNode is VarProofNode) {
+                if (currNode is InstVarProofNode) {
                     nodesToCancel.addAll(currNode.proofs)
                 } else if (currNode is CalculatedProofNode) {
                     nodesToCancel.addAll(currNode.args)
                 }
             }
 
-            if (proofToRemain is VarProofNode) {
+            if (proofToRemain is InstVarProofNode) {
                 rootsToStartCancellingFrom.add(proofToRemain)
             } else if (proofToRemain is CalculatedProofNode) {
                 rootsToStartCancellingFrom.addAll(proofToRemain.args)
@@ -204,7 +213,7 @@ object ProofAssistant {
         }
     }
 
-    private fun findProof(stmt: VarProofNode, ctx: MetamathContext): List<ProofNode> {
+    private fun findProof(stmt: InstVarProofNode, ctx: MetamathContext): List<ProofNode> {
         val result = ArrayList<ProofNode>()
         ctx.iterateHypotheses { hyp->
             if ((hyp.type == 'f' || hyp.type == 'e') && hyp.content.contentEquals(stmt.value)) {
@@ -233,7 +242,7 @@ object ProofAssistant {
                     val calculatedProofNode = CalculatedProofNode(
                         args = assertion.hypotheses.asSequence().map {
                             val value = applySubstitution(it.content, subsList)
-                            VarProofNode(
+                            InstVarProofNode(
                                 value = value,
                                 valueStr = toString(value, ctx),
                             )
@@ -252,11 +261,17 @@ object ProofAssistant {
         return result
     }
 
-    private fun mkStmt(str:String, symbToInt:(String) -> Int): IntArray {
-        return str.trim().split(' ').asSequence()
-            .map(symbToInt)
+    private fun mkStmt(stmt: IntArray, ctx: MetamathContext): Stmt = Stmt(
+        value = stmt,
+        valueStr = stmt.asSequence().map { ctx.getSymbolByNumber(it) }.joinToString(" ")
+    )
+
+    private fun mkStmt(str:String, ctx: MetamathContext): Stmt = mkStmt(
+        stmt = str.trim().split(' ').asSequence()
+            .map { ctx.getNumberBySymbol(it) }
             .toList()
-            .toIntArray()
-    }
+            .toIntArray(),
+        ctx = ctx
+    )
 
 }

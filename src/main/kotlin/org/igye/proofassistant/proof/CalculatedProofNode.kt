@@ -7,9 +7,5 @@ class CalculatedProofNode(
     val args: List<VarProofNode>,
     val substitution: List<IntArray>,
     val assertion: Assertion,
-    val result: VarProofNode
-):ProofNode(value = result.value, valueStr = MetamathUtils.toString(assertion)) {
-    override fun toString(): String {
-        return valueStr
-    }
-}
+    val result: InstVarProofNode
+):ProofNode(stmt = Stmt(value = result.stmt.value, valueStr = MetamathUtils.toString(assertion)))

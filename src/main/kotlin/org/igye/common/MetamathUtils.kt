@@ -27,10 +27,11 @@ object MetamathUtils {
     fun toDto(node: ProofNode): ProofNodeDto {
         return when (node) {
             is ConstProofNode -> toDto(node)
-            is VarProofNode -> toDto(node)
+            is InstVarProofNode -> toDto(node)
             is CalculatedProofNode -> toDto(node)
             else -> ProofNodeDto(
                 u = "Unexpected type of proof node: ${node.javaClass.canonicalName}",
+                hash = System.identityHashCode(node),
                 proofLength = node.proofLength,
                 isCanceled = node.isCanceled
             )
@@ -40,14 +41,16 @@ object MetamathUtils {
     fun toDto(node: ConstProofNode): ProofNodeDto {
         return ProofNodeDto(
             f = node.valueStr,
+            hash = System.identityHashCode(node),
             proofLength = node.proofLength,
             isCanceled = node.isCanceled,
         )
     }
 
-    fun toDto(node: VarProofNode): ProofNodeDto {
+    fun toDto(node: InstVarProofNode): ProofNodeDto {
         return ProofNodeDto(
             v = node.valueStr,
+            hash = System.identityHashCode(node),
             proofLength = node.proofLength,
             isCanceled = node.isCanceled,
             proofs = node.proofs.map { toDto(it) }
@@ -57,6 +60,7 @@ object MetamathUtils {
     fun toDto(node: CalculatedProofNode): ProofNodeDto {
         return ProofNodeDto(
             a = node.valueStr,
+            hash = System.identityHashCode(node),
             proofLength = node.proofLength,
             isCanceled = node.isCanceled,
             args = node.args.map { toDto(it) }
@@ -68,10 +72,11 @@ object MetamathUtils {
     }
 
     fun toString(assertion: Assertion):String {
-        return assertion.hypotheses.asSequence()
+        return assertion.statement.content.asSequence().map(assertion.visualizationData::numToSym).joinToString(separator = " ") +
+                " <=== " + assertion.hypotheses.asSequence()
             .map { it.content.asSequence().map(assertion.visualizationData::numToSym).joinToString(separator = " ") }
-            .joinToString(separator = " ::: ") + " ===> " +
-                assertion.statement.content.asSequence().map(assertion.visualizationData::numToSym).joinToString(separator = " ")
+            .joinToString(separator = " ::: ")
+
     }
 
     fun applySubstitution(value:IntArray, substitution: List<IntArray>): IntArray {

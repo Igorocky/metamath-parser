@@ -1,6 +1,7 @@
 package org.igye.proofassistant.proof
 
-sealed class VarProofNode(
+class RefVarProofNode(
     var argOf: CalculatedProofNode? = null,
+    val ref: InstVarProofNode,
     stmt: Stmt,
 ):ProofNode(stmt = stmt)

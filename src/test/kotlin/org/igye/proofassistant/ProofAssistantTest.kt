@@ -1,5 +1,6 @@
 package org.igye.proofassistant
 
+import org.igye.common.MetamathUtils
 import org.igye.metamathparser.Parsers
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
@@ -13,7 +14,9 @@ internal class ProofAssistantTest {
         val ctx = Parsers.parseMetamathFile(File("C:\\igye\\books\\metamath/set.mm"))
 
         //when/then
-        assertNotNull(ProofAssistant.prove("wff ( y e. NN -> y e. CC )", ctx))
+        val prove = ProofAssistant.prove("wff ( x + y ) = ( x + y )", ctx)
+        println(MetamathUtils.toJson(prove))
+        assertNotNull(prove)
     }
 
     @Test

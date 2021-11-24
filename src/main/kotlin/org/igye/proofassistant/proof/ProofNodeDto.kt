@@ -5,6 +5,7 @@ class ProofNodeDto(
     val a: String? = null,
     val f: String? = null,
     val u: String? = null,
+    val hash: Int,
     val proofLength: Int,
     val isCanceled: Boolean,
     val proofs: List<ProofNodeDto> = emptyList(),
