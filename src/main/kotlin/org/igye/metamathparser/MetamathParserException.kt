@@ -1,5 +1,5 @@
 package org.igye.metamathparser
 
-class MetamathParserException(msg:String):RuntimeException(msg) {
+open class MetamathParserException(msg:String):RuntimeException(msg) {
     constructor():this("")
 }

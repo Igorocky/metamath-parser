@@ -14,9 +14,7 @@ internal class ProofAssistantTest {
         val ctx = Parsers.parseMetamathFile(File("C:\\igye\\books\\metamath/set.mm"))
 
         //when/then
-        val prove = ProofAssistant.prove("wff ( x + y ) = ( x + y )", ctx)
-        println(MetamathUtils.toJson(prove))
-        assertNotNull(prove)
+        assertNotNull(ProofAssistant.prove("wff ( y e. NN -> y e. CC )", ctx))
     }
 
     @Test

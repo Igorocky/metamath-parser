@@ -1,6 +1,7 @@
 package org.igye.proofassistant
 
 import org.igye.common.ContinueInstr.CONTINUE
+import org.igye.common.ContinueInstr.STOP
 import org.igye.common.MetamathUtils
 import org.igye.common.MetamathUtils.applySubstitution
 import org.igye.common.MetamathUtils.collectAllVariables
@@ -15,8 +16,8 @@ import org.igye.proofassistant.proof.*
 import org.igye.proofassistant.substitutions.Substitutions
 import java.io.File
 import java.util.*
+import kotlin.collections.ArrayList
 import kotlin.collections.HashMap
-import kotlin.random.Random
 
 fun main() {
     val ctx = parseMetamathFile(File("C:\\igye\\books\\metamath/set.mm"))
@@ -72,9 +73,9 @@ object ProofAssistant {
                 proofSteps.asSequence().map { intToStr(it) }.joinToString("") + " $."
     }
 
-    fun prove(expr: String, ctx: MetamathContext): InstVarProofNode {
+    fun prove(expr: String, ctx: MetamathContext, label: String = UUID.randomUUID().toString()): ValProofNode {
         val allowedStatementsTypes: Set<Int> = setOf("wff", "setvar", "class").map { ctx.getNumberBySymbol(it) }.toSet()
-        val result = InstVarProofNode(stmt = mkStmt(expr, ctx))
+        val result = PendingProofNode(stmt = mkStmt(expr, ctx))
         if (!allowedStatementsTypes.contains(result.stmt.value[0])) {
             throw MetamathParserException("!allowedStatementsTypes.contains(result.value[0])")
         }
@@ -88,28 +89,55 @@ object ProofAssistant {
             squareBracketClose = ctx.getNumberBySymbol("]"),
         )
 
-        val statementsToProve = HashMap<Stmt,InstVarProofNode>()
+        val statementsToProve = HashMap<Stmt,ProofNode>()
         statementsToProve[result.stmt] = result
-        val provedStatements = HashMap<Stmt,InstVarProofNode>()
+        val pendingStatements: MutableMap<Stmt, ProofNode> = HashMap()
+        val provedStatements: MutableMap<Stmt, ProofNode> = HashMap()
 
-        while (result.proofLength < 0 && statementsToProve.isNotEmpty()) {
-            val currStmt: InstVarProofNode = statementsToProve.iterator().next().value
-            statementsToProve.remove(currStmt.stmt)
-            val proof: InstVarProofNode? = provedStatements[currStmt.stmt]
-            if (proof != null) {
-                val ref = RefVarProofNode(stmt = currStmt.stmt, ref = proof, argOf = currStmt.argOf)
+        while (!provedStatements.contains(result.stmt) && statementsToProve.isNotEmpty()) {
+            val currStmtToProve: ProofNode = statementsToProve.iterator().next().value
+            statementsToProve.remove(currStmtToProve.stmt)
+            if (pendingStatements.contains(currStmtToProve.stmt)) {
+                throw ProofAssistantException("pendingStatements.contains(currStmtToProve.stmt)")
+            }
+            pendingStatements[currStmtToProve.stmt] = currStmtToProve
+
+            val constProof = findConstant(currStmtToProve, ctx)
+            if (constProof != null) {
+
             } else {
 
             }
-            val foundProofs = findProof(stmt = currStmt, ctx = ctx)
-            for (foundProof in foundProofs) {
-                currStmt.proofs.add(foundProof)
-                if (foundProof is CalculatedProofNode) {
-                    statementsToProve.addAll(foundProof.args)
+
+            val foundProofContinuations = findProofContinuation(stmt = currStmtToProve, ctx = ctx)
+            for (proofContinuation in foundProofContinuations) {
+                if (proofContinuation is ConstProofNode) {
+
+                } else if (proofContinuation is InstVarProofNode) {
+                    val existingSameStatementProved: InstVarProofNode? = provedStatements[proofContinuation.stmt]
+                    if (existingSameStatementProved != null) {
+                        val ref = replaceInstWithRef(notProvedStatement = proofContinuation, existingSameStatementProved = existingSameStatementProved)
+                        markProved(ref)
+                    }
+                    currStmtToProve.proofs.add(proofContinuation)
+                    if (proofContinuation is CalculatedProofNode) {
+                        statementsToProve.addAll(proofContinuation.args)
+                    }
+                } else {
+                    throw ProofAssistantException("Unexpected type of proofContinuation: ${proofContinuation.javaClass.canonicalName}")
                 }
+
             }
-            for (foundProof in foundProofs) {
+            for (foundProof in foundProofContinuations) {
                 markProved(foundProof)
+            }
+
+            val existingSameStatementProved: InstVarProofNode? = provedStatements[currStmtToProve.stmt]
+            if (existingSameStatementProved != null) {
+                val ref = replaceInstWithRef(notProvedStatement = currStmtToProve, existingSameStatementProved = existingSameStatementProved)
+                markProved(ref)
+            } else {
+
             }
         }
 
@@ -123,8 +151,39 @@ object ProofAssistant {
         return result
     }
 
-    private fun replaceInstWithRef(inst: InstVarProofNode, ref: RefVarProofNode) {
+    private fun constProofFound(
+        nodeToProve: ProofNode,
+        constProof: ConstProofNode,
+//        pendingStatements: MutableMap<Stmt, ProofNode>,
+//        provedStatements: MutableMap<Stmt, ProofNode>,
+    ) {
+        if (nodeToProve is PendingProofNode) {
+            val parent = nodeToProve.parent
+            if (parent is CalcProofNode) {
+                parent.args.removeIf { it === nodeToProve }
+                parent.args.add(constProof)
+            } else if (parent is ValProofNode) {
+                parent.proof = constProof
+            } else {
+                throw AssumptionDoesntHoldException()
+            }
+        } else if (nodeToProve is ValProofNode) {
 
+        } else {
+            throw AssumptionDoesntHoldException()
+        }
+        markProved(constProof)
+    }
+
+    private fun replaceInstWithRef(notProvedStatement: InstVarProofNode, existingSameStatementProved: InstVarProofNode): RefVarProofNode {
+        if (notProvedStatement.proofs.isNotEmpty()) {
+            throw ProofAssistantException("notProvedStatement.proofs.isNotEmpty()")
+        }
+        val ref = RefVarProofNode(stmt = notProvedStatement.stmt, ref = existingSameStatementProved, argOf = notProvedStatement.argOf)
+        notProvedStatement.argOf!!.args.removeIf { it === notProvedStatement }
+        notProvedStatement.argOf!!.args.add(ref)
+        existingSameStatementProved.isReused = true
+        return ref
     }
 
     private fun intToStr(i: Int): String {
@@ -146,19 +205,21 @@ object ProofAssistant {
     }
 
     private fun markProved(proofNode: ProofNode) {
-        if (proofNode.proofLength >= 0 || proofNode.isCanceled) {
-            return
+        if (proofNode.isCanceled) {
+            throw AssumptionDoesntHoldException()
         }
-        var toBeMarkedAsProved: InstVarProofNode? = if (proofNode is ConstProofNode) {
+        var toBeMarkedAsProved: ValProofNode? = if (proofNode is ConstProofNode) {
             proofNode.proofLength = 0
             proofNode.provesWhat
         } else if (proofNode is CalculatedProofNode && proofNode.args.isEmpty()) {
             proofNode.proofLength = 0
             proofNode.result
+        } else if (proofNode is RefVarProofNode) {
+            proofNode
         } else {
             null
         }
-        var proofLength = 1
+        var proofLength = if (toBeMarkedAsProved is RefVarProofNode) 0 else 1
         while (toBeMarkedAsProved != null) {
             if (toBeMarkedAsProved.proofLength >= 0) {
                 throw ProofAssistantException("toBeMarkedAsProved.proofLength >= 0")
@@ -177,7 +238,7 @@ object ProofAssistant {
                 break
             }
         }
-        if (toBeMarkedAsProved != null) {
+        if (toBeMarkedAsProved is InstVarProofNode) {
             cancelNotProved(toBeMarkedAsProved)
         }
     }
@@ -208,12 +269,29 @@ object ProofAssistant {
             if (proofToRemain is InstVarProofNode) {
                 rootsToStartCancellingFrom.add(proofToRemain)
             } else if (proofToRemain is CalculatedProofNode) {
-                rootsToStartCancellingFrom.addAll(proofToRemain.args)
+                for (arg in proofToRemain.args) {
+                    if (arg is InstVarProofNode) {
+                        rootsToStartCancellingFrom.add(arg)
+                    }
+                }
             }
         }
     }
 
-    private fun findProof(stmt: InstVarProofNode, ctx: MetamathContext): List<ProofNode> {
+    private fun findConstant(nodeToProve: ProofNode, ctx: MetamathContext): ConstProofNode? {
+        var result: ConstProofNode? = null
+        ctx.iterateHypotheses { hyp->
+            if ((hyp.type == 'f' || hyp.type == 'e') && hyp.content.contentEquals(nodeToProve.stmt.value)) {
+                result = ConstProofNode(src = hyp, stmt = nodeToProve.stmt)
+                STOP
+            } else {
+                CONTINUE
+            }
+        }
+        return result
+    }
+
+    private fun findProofContinuation(stmt: InstVarProofNode, ctx: MetamathContext): List<ProofNode> {
         val result = ArrayList<ProofNode>()
         ctx.iterateHypotheses { hyp->
             if ((hyp.type == 'f' || hyp.type == 'e') && hyp.content.contentEquals(stmt.value)) {
