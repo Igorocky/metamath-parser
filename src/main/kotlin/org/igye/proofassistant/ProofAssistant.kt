@@ -13,6 +13,7 @@ import org.igye.metamathparser.MetamathParserException
 import org.igye.metamathparser.Parsers.parseMetamathFile
 import org.igye.metamathparser.Statement
 import org.igye.proofassistant.proof.*
+import org.igye.proofassistant.proof.ProofNodeState.PROVED
 import org.igye.proofassistant.substitutions.Substitutions
 import java.io.File
 import java.util.*
@@ -89,22 +90,15 @@ object ProofAssistant {
             squareBracketClose = ctx.getNumberBySymbol("]"),
         )
 
-        val statementsToProve = HashMap<Stmt,ProofNode>()
-        statementsToProve[result.stmt] = result
-        val pendingStatements: MutableMap<Stmt, ProofNode> = HashMap()
-        val provedStatements: MutableMap<Stmt, ProofNode> = HashMap()
+        val proofContext = ProofContext()
+        proofContext.addStatementToProve(result)
 
-        while (!provedStatements.contains(result.stmt) && statementsToProve.isNotEmpty()) {
-            val currStmtToProve: ProofNode = statementsToProve.iterator().next().value
-            statementsToProve.remove(currStmtToProve.stmt)
-            if (pendingStatements.contains(currStmtToProve.stmt)) {
-                throw ProofAssistantException("pendingStatements.contains(currStmtToProve.stmt)")
-            }
-            pendingStatements[currStmtToProve.stmt] = currStmtToProve
+        while (result.state != PROVED && proofContext.hasStatementsToProve()) {
+            val currStmtToProve: ProofNode = proofContext.getNextStatementToProve()
 
-            val constProof = findConstant(currStmtToProve, ctx)
+            val constProof = findConstant(currStmtToProve, ctx, proofContext)
             if (constProof != null) {
-
+                proofContext.constProofFound(nodeToProve = currStmtToProve, constProof = constProof)
             } else {
 
             }
@@ -149,30 +143,6 @@ object ProofAssistant {
         }
 
         return result
-    }
-
-    private fun constProofFound(
-        nodeToProve: ProofNode,
-        constProof: ConstProofNode,
-//        pendingStatements: MutableMap<Stmt, ProofNode>,
-//        provedStatements: MutableMap<Stmt, ProofNode>,
-    ) {
-        if (nodeToProve is PendingProofNode) {
-            val parent = nodeToProve.parent
-            if (parent is CalcProofNode) {
-                parent.args.removeIf { it === nodeToProve }
-                parent.args.add(constProof)
-            } else if (parent is ValProofNode) {
-                parent.proof = constProof
-            } else {
-                throw AssumptionDoesntHoldException()
-            }
-        } else if (nodeToProve is ValProofNode) {
-
-        } else {
-            throw AssumptionDoesntHoldException()
-        }
-        markProved(constProof)
     }
 
     private fun replaceInstWithRef(notProvedStatement: InstVarProofNode, existingSameStatementProved: InstVarProofNode): RefVarProofNode {
@@ -278,11 +248,11 @@ object ProofAssistant {
         }
     }
 
-    private fun findConstant(nodeToProve: ProofNode, ctx: MetamathContext): ConstProofNode? {
+    private fun findConstant(nodeToProve: ProofNode, ctx: MetamathContext, proofContext: ProofContext): ConstProofNode? {
         var result: ConstProofNode? = null
         ctx.iterateHypotheses { hyp->
             if ((hyp.type == 'f' || hyp.type == 'e') && hyp.content.contentEquals(nodeToProve.stmt.value)) {
-                result = ConstProofNode(src = hyp, stmt = nodeToProve.stmt)
+                result = ConstProofNode(src = hyp, stmt = nodeToProve.stmt, proofContext = proofContext)
                 STOP
             } else {
                 CONTINUE
