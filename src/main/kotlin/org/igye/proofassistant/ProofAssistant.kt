@@ -94,58 +94,60 @@ object ProofAssistant {
         )
 
         val proofContext = ProofContext()
-        proofContext.addStatementToProve(PendingProofNode(stmt = stmtToProve, proofContext = proofContext))
+        proofContext.addStatementToProve(PendingProofNode(stmt = stmtToProve))
 
-        while (proofContext.isProved(stmtToProve) == null && proofContext.hasStatementsToProve()) {
+        while (proofContext.getProved(stmtToProve) == null && proofContext.hasStatementsToProve()) {
             val currStmtToProve: PendingProofNode = proofContext.getNextStatementToProve()
-            proofContext.markWaiting(currStmtToProve)
 
-            val constProof = findConstant(currStmtToProve.stmt, ctx, proofContext)
+            val constProof = findConstant(currStmtToProve.stmt, ctx)
             if (constProof != null) {
-                proofContext.markProved(constProof)
-                proofContext.replacePendingNodeWithConstNode(pendingNode = currStmtToProve, constProofNode = constProof)
+                proofContext.proofFoundForNodeToBeProved(nodeToBeProved = currStmtToProve, foundProof = constProof)
             } else {
-                for (asrtNode in findMatchingAssertions(currStmtToProve.stmt, ctx, proofContext)) {
-                    currStmtToProve.proofs.add(asrtNode)
-                    asrtNode.parents.add(currStmtToProve)
-                    for (arg in asrtNode.assertion.hypotheses) {
-                        val stmt = mkStmt(applySubstitution(arg.content, asrtNode.substitution), ctx)
-                        val existingProof =
-                            proofContext.isProved(stmt) ?: proofContext.isWaiting(stmt) ?: proofContext.isToBeProved(
-                                stmt
-                            )
-                        if (existingProof != null) {
-                            existingProof.parents.add(asrtNode)
-                            asrtNode.args.add(existingProof)
-                            continue
-                        }
-                        val constProof = findConstant(stmt, ctx, proofContext)
-                        if (constProof != null) {
-                            proofContext.markProved(constProof)
-                            asrtNode.args.add(constProof)
-                            continue
-                        }
-                        val pendingNode = PendingProofNode(proofContext = proofContext, stmt = stmt)
-                        proofContext.addStatementToProve(pendingNode)
-                        asrtNode.args.add(pendingNode)
-                    }
+                val matchingAssertions = findMatchingAssertions(currStmtToProve.stmt, ctx)
+                for (asrtNode: CalcProofNode in matchingAssertions) {
+                    createArgsForCalcNode(asrtNode, proofContext, ctx)
                     if (asrtNode.args.all { it.state == ProofNodeState.PROVED }) {
-                        proofContext.markProved(asrtNode)
-                        proofContext.markParentsAsProved(asrtNode)
+                        proofContext.proofFoundForNodeToBeProved(nodeToBeProved = currStmtToProve, foundProof = asrtNode)
                         break
+                    } else {
+                        currStmtToProve.proofs.add(asrtNode)
+                        asrtNode.dependants.add(currStmtToProve)
+                        asrtNode.state = ProofNodeState.WAITING
                     }
                 }
             }
+
+            if (currStmtToProve.state == ProofNodeState.TO_BE_PROVED) {
+                proofContext.markWaiting(currStmtToProve)
+            }
         }
 
-//        if (PendingProofNode(stmt = stmtToProve, proofContext = proofContext).proofLength < 0) {
-//            println("-----------------------------")
-//            println(toJson(PendingProofNode(stmt = stmtToProve, proofContext = proofContext)))
-//            println("-----------------------------")
-//            throw ProofAssistantException("result.proveLength < 0")
-//        }
+        return proofContext.getProved(stmtToProve)?:proofContext.getWaiting(stmtToProve)!!
+    }
 
-        return proofContext.isProved(stmtToProve)?:proofContext.isWaiting(stmtToProve)!!
+    private fun createArgsForCalcNode(asrtNode: CalcProofNode, proofContext: ProofContext, ctx: MetamathContext) {
+        for (arg in asrtNode.assertion.hypotheses) {
+            val argStmt = mkStmt(applySubstitution(arg.content, asrtNode.substitution), ctx)
+            val existingProof = proofContext.getProved(argStmt)
+                ?: proofContext.getWaiting(argStmt)
+                ?: proofContext.getToBeProved(argStmt)
+            if (existingProof != null) {
+                existingProof.dependants.add(asrtNode)
+                asrtNode.args.add(existingProof)
+            } else {
+                val constProof = findConstant(argStmt, ctx)
+                if (constProof != null) {
+                    proofContext.markProved(constProof)
+                    constProof.dependants.add(asrtNode)
+                    asrtNode.args.add(constProof)
+                } else {
+                    val pendingNode = PendingProofNode(stmt = argStmt)
+                    proofContext.addStatementToProve(pendingNode)
+                    pendingNode.dependants.add(asrtNode)
+                    asrtNode.args.add(pendingNode)
+                }
+            }
+        }
     }
 
     private fun intToStr(i: Int): String {
@@ -166,11 +168,11 @@ object ProofAssistant {
         return sb.reverse().toString()
     }
 
-    private fun findConstant(stmt: Stmt, ctx: MetamathContext, proofContext: ProofContext): ConstProofNode? {
+    private fun findConstant(stmt: Stmt, ctx: MetamathContext): ConstProofNode? {
         var result: ConstProofNode? = null
         ctx.iterateHypotheses { hyp->
             if ((hyp.type == 'f' || hyp.type == 'e') && hyp.content.contentEquals(stmt.value)) {
-                result = ConstProofNode(src = hyp, stmt = stmt, proofContext = proofContext)
+                result = ConstProofNode(src = hyp, stmt = stmt)
                 STOP
             } else {
                 CONTINUE
@@ -179,7 +181,7 @@ object ProofAssistant {
         return result
     }
 
-    private fun findMatchingAssertions(stmt: Stmt, ctx: MetamathContext, proofContext: ProofContext): List<CalcProofNode> {
+    private fun findMatchingAssertions(stmt: Stmt, ctx: MetamathContext): List<CalcProofNode> {
         val result = ArrayList<CalcProofNode>()
         for (assertion in ctx.getAssertions().values) {
             Substitutions.iterateSubstitutions(
@@ -194,7 +196,6 @@ object ProofAssistant {
                     }
                     result.add(
                         CalcProofNode(
-                            proofContext = proofContext,
                             stmt = stmt,
                             substitution = subsList,
                             assertion = assertion,

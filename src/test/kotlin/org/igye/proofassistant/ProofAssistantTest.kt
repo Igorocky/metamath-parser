@@ -2,8 +2,8 @@ package org.igye.proofassistant
 
 import org.igye.common.MetamathUtils
 import org.igye.metamathparser.Parsers
-import org.junit.Assert.assertEquals
-import org.junit.Assert.assertNotNull
+import org.igye.proofassistant.proof.ProofNodeState.PROVED
+import org.junit.Assert.*
 import org.junit.Test
 import java.io.File
 
@@ -14,7 +14,9 @@ internal class ProofAssistantTest {
         val ctx = Parsers.parseMetamathFile(File("C:\\igye\\books\\metamath/set.mm"))
 
         //when/then
-        assertNotNull(ProofAssistant.prove("wff ( y e. NN -> y e. CC )", ctx))
+        val proof = ProofAssistant.prove("wff ( y e. NN -> y e. CC )", ctx)
+        println(MetamathUtils.toJson(proof))
+        assertTrue(proof.state == PROVED)
     }
 
     @Test
