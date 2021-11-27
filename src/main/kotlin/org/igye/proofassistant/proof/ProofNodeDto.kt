@@ -1,11 +1,30 @@
 package org.igye.proofassistant.proof
 
-class ProofNodeDto(
-    val c: String? = null,
-    val a: String? = null,
-    val w: String? = null,
+import com.fasterxml.jackson.annotation.JsonPropertyOrder
+
+@JsonPropertyOrder(value = ["a", "c", "w"])
+sealed class ProofNodeDto(
     val hash: Int,
     val state: ProofNodeState,
-    val proofs: List<ProofNodeDto> = emptyList(),
-    val args: List<ProofNodeDto> = emptyList(),
 )
+
+class CalcProofNodeDto(
+    val a: String,
+    hash: Int,
+    state: ProofNodeState,
+    val args: List<ProofNodeDto>,
+): ProofNodeDto(hash = hash, state = state)
+
+class ConstProofNodeDto(
+    val c: String,
+    val label: String,
+    hash: Int,
+    state: ProofNodeState,
+): ProofNodeDto(hash = hash, state = state)
+
+class PendingProofNodeDto(
+    val w: String,
+    val proofs: List<ProofNodeDto>,
+    hash: Int,
+    state: ProofNodeState,
+): ProofNodeDto(hash = hash, state = state)

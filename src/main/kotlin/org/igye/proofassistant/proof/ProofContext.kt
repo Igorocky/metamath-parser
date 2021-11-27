@@ -147,6 +147,14 @@ class ProofContext {
                 }
                 is CalcProofNode -> {
                     if (currNode.args.all { it.state == PROVED }) {
+                        for (dependant in currNode.dependants) {
+                            if (dependant is PendingProofNode) {
+                                //all the dependants will be processed on the next step
+                                cancel(dependant)
+                            } else {
+                                throw AssumptionDoesntHoldException()
+                            }
+                        }
                         markProved(currNode)
                         currNode.dependants
                     } else {
@@ -171,7 +179,7 @@ class ProofContext {
             rootsToStartCancellingFrom.addAll(when (currNode) {
                 is CalcProofNode -> currNode.args
                 is PendingProofNode -> currNode.proofs
-                else -> throw AssumptionDoesntHoldException()
+                is ConstProofNode -> emptyList()
             })
         }
     }

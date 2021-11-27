@@ -36,16 +36,17 @@ object MetamathUtils {
         }
     }
 
-    fun toDto(node: ConstProofNode): ProofNodeDto {
-        return ProofNodeDto(
+    fun toDto(node: ConstProofNode): ConstProofNodeDto {
+        return ConstProofNodeDto(
             c = node.stmt.valueStr,
+            label = node.src.label,
             hash = System.identityHashCode(node),
             state = node.state,
         )
     }
 
-    fun toDto(node: PendingProofNode): ProofNodeDto {
-        return ProofNodeDto(
+    fun toDto(node: PendingProofNode): PendingProofNodeDto {
+        return PendingProofNodeDto(
             w = node.stmt.valueStr,
             hash = System.identityHashCode(node),
             state = node.state,
@@ -53,8 +54,8 @@ object MetamathUtils {
         )
     }
 
-    fun toDto(node: CalcProofNode): ProofNodeDto {
-        return ProofNodeDto(
+    fun toDto(node: CalcProofNode): CalcProofNodeDto {
+        return CalcProofNodeDto(
             a = node.stmt.valueStr,
             hash = System.identityHashCode(node),
             state = node.state,
