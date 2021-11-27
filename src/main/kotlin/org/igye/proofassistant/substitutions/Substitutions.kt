@@ -7,6 +7,7 @@ import java.util.*
 object Substitutions {
 
     fun iterateSubstitutions(stmt:IntArray, asrtStmt:IntArray, parenCounterProducer: () -> ParenthesesCounter, consumer: ((Substitution) -> ContinueInstr)) {
+        // TODO: 11/27/2021 check stmt length before proceeding
         val maxVarNumberOrNull = asrtStmt.asSequence().filter { it >= 0 }.maxOrNull()
         if (maxVarNumberOrNull == null) {
             if (asrtStmt.contentEquals(stmt)) {

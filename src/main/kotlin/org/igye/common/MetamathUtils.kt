@@ -8,6 +8,10 @@ import org.igye.metamathparser.MetamathContext
 import org.igye.metamathparser.MetamathParserException
 import org.igye.metamathparser.Statement
 import org.igye.proofassistant.proof.*
+import org.igye.proofassistant.proof.prooftree.CalcProofNode
+import org.igye.proofassistant.proof.prooftree.ConstProofNode
+import org.igye.proofassistant.proof.prooftree.PendingProofNode
+import org.igye.proofassistant.proof.prooftree.ProofNode
 
 object MetamathUtils {
     private val MAPPER = ObjectMapper()
@@ -27,42 +31,33 @@ object MetamathUtils {
     fun toDto(node: ProofNode): ProofNodeDto {
         return when (node) {
             is ConstProofNode -> toDto(node)
-            is InstVarProofNode -> toDto(node)
-            is CalculatedProofNode -> toDto(node)
-            else -> ProofNodeDto(
-                u = "Unexpected type of proof node: ${node.javaClass.canonicalName}",
-                hash = System.identityHashCode(node),
-                proofLength = node.proofLength,
-                isCanceled = node.isCanceled
-            )
+            is CalcProofNode -> toDto(node)
+            is PendingProofNode -> toDto(node)
         }
     }
 
     fun toDto(node: ConstProofNode): ProofNodeDto {
         return ProofNodeDto(
-            f = node.valueStr,
+            c = node.stmt.valueStr,
             hash = System.identityHashCode(node),
-            proofLength = node.proofLength,
-            isCanceled = node.isCanceled,
+            state = node.state,
         )
     }
 
-    fun toDto(node: InstVarProofNode): ProofNodeDto {
+    fun toDto(node: PendingProofNode): ProofNodeDto {
         return ProofNodeDto(
-            v = node.valueStr,
+            w = node.stmt.valueStr,
             hash = System.identityHashCode(node),
-            proofLength = node.proofLength,
-            isCanceled = node.isCanceled,
+            state = node.state,
             proofs = node.proofs.map { toDto(it) }
         )
     }
 
-    fun toDto(node: CalculatedProofNode): ProofNodeDto {
+    fun toDto(node: CalcProofNode): ProofNodeDto {
         return ProofNodeDto(
-            a = node.valueStr,
+            a = node.stmt.valueStr,
             hash = System.identityHashCode(node),
-            proofLength = node.proofLength,
-            isCanceled = node.isCanceled,
+            state = node.state,
             args = node.args.map { toDto(it) }
         )
     }
