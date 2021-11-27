@@ -14,7 +14,9 @@ internal class ProofAssistantTest {
         val ctx = Parsers.parseMetamathFile(File("C:\\igye\\books\\metamath/set.mm"))
 
         //when/then
-        assertEquals(PROVED, ProofAssistant.prove("wff ( y e. NN -> y e. CC )", ctx).state)
+        val proof = ProofAssistant.prove("wff ( y e. NN -> y e. CC )", ctx)
+        println(MetamathUtils.toJson(proof))
+        assertEquals(PROVED, proof.state)
     }
 
     @Test

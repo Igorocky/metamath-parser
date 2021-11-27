@@ -57,6 +57,7 @@ object MetamathUtils {
     fun toDto(node: CalcProofNode): CalcProofNodeDto {
         return CalcProofNodeDto(
             a = node.stmt.valueStr,
+            label = node.assertion.statement.label,
             hash = System.identityHashCode(node),
             state = node.state,
             args = node.args.map { toDto(it) }

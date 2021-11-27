@@ -8,18 +8,19 @@ sealed class ProofNodeDto(
     val state: ProofNodeState,
 )
 
-class CalcProofNodeDto(
-    val a: String,
-    hash: Int,
-    state: ProofNodeState,
-    val args: List<ProofNodeDto>,
-): ProofNodeDto(hash = hash, state = state)
-
 class ConstProofNodeDto(
     val c: String,
     val label: String,
     hash: Int,
     state: ProofNodeState,
+): ProofNodeDto(hash = hash, state = state)
+
+class CalcProofNodeDto(
+    val a: String,
+    val label: String,
+    hash: Int,
+    state: ProofNodeState,
+    val args: List<ProofNodeDto>,
 ): ProofNodeDto(hash = hash, state = state)
 
 class PendingProofNodeDto(
