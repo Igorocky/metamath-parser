@@ -24,11 +24,12 @@ internal class ProofAssistantTest {
         //given
         val ctx = Parsers.parseMetamathFile(File("C:\\igye\\books\\metamath/set.mm"))
         val proof = ProofAssistant.prove("wff ( y e. NN -> y e. CC )", ctx)
+        println(MetamathUtils.toJson(proof))
 
         //when
         val provableAssertion = ProofAssistant.createProvableAssertion(proof, ctx)
 
         //then
-        assertEquals("\$p wff ( y e. NN -> y e. CC ) \$= ( wi wcel cc cv cn ) AEFCAEDCB \$.", provableAssertion)
+        assertEquals("\$p wff ( y e. NN -> y e. CC ) \$= ( cv cn wcel cc wi ) ABZCDGEDF \$.", provableAssertion)
     }
 }

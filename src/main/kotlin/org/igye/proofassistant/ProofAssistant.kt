@@ -12,6 +12,7 @@ import org.igye.metamathparser.MetamathParserException
 import org.igye.metamathparser.Parsers.parseMetamathFile
 import org.igye.metamathparser.Statement
 import org.igye.proofassistant.proof.*
+import org.igye.proofassistant.proof.ProofNodeState.PROVED
 import org.igye.proofassistant.proof.prooftree.CalcProofNode
 import org.igye.proofassistant.proof.prooftree.ConstProofNode
 import org.igye.proofassistant.proof.prooftree.PendingProofNode
@@ -21,6 +22,7 @@ import java.io.File
 import java.util.*
 import kotlin.collections.ArrayList
 import kotlin.collections.HashMap
+import kotlin.math.absoluteValue
 
 fun main() {
     val ctx = parseMetamathFile(File("C:\\igye\\books\\metamath/set.mm"))
@@ -30,6 +32,7 @@ fun main() {
 }
 
 object ProofAssistant {
+    private val SAVE_CURR_VALUE_CMD = Int.MIN_VALUE
 
     fun createProvableAssertion(proofNode: ProofNode, ctx: MetamathContext): String {
         val essentialHypotheses: List<Statement> = ctx.getHypotheses { it.type == 'e'}
@@ -42,7 +45,6 @@ object ProofAssistant {
         for (i in proofLabels.indices) {
             labelToIdx[proofLabels[i]] = i
         }
-
         fun labelToInt(label:String): Int {
             if (!labelToIdx.containsKey(label)) {
                 labelToIdx[label] = proofLabels.size
@@ -51,33 +53,54 @@ object ProofAssistant {
             return labelToIdx[label]!! + 1
         }
 
-        val proofStepsStack = Stack<Int>()
-        val nodesToProcess = Stack<ProofNode>()
+        val savedNodeLabelToInt = HashMap<String,Int>()
+        fun savedNodeLabelToInt(label:String): Int {
+            if (!savedNodeLabelToInt.containsKey(label)) {
+                savedNodeLabelToInt[label] = savedNodeLabelToInt.size+1
+            }
+            return -savedNodeLabelToInt[label]!!
+        }
+
+        val proofSteps = ArrayList<Int>()
+        val nodesToProcess = Stack<Any>()
         nodesToProcess.push(proofNode)
         while (nodesToProcess.isNotEmpty()) {
-            val curNodeProof = nodesToProcess.pop()
-            if (curNodeProof is CalcProofNode) {
-                if (curNodeProof.dependants.size > 1) {
-
+            val curNodeToProcess = nodesToProcess.pop()
+            if (curNodeToProcess is ConstProofNode) {
+                proofSteps.add(labelToInt(curNodeToProcess.src.label))
+            } else if (curNodeToProcess is CalcProofNode) {
+                if (curNodeToProcess.label != null) {
+                    proofSteps.add(savedNodeLabelToInt(curNodeToProcess.label!!))
+                } else {
+                    nodesToProcess.push(Optional.of(curNodeToProcess))
+                    for (i in curNodeToProcess.args.size-1 downTo 0) {
+                        nodesToProcess.push(curNodeToProcess.args[i])
+                    }
                 }
-                proofStepsStack.push(labelToInt(curNodeProof.assertion.statement.label))
-                curNodeProof.args.forEach { nodesToProcess.push(it) }
-            } else if (curNodeProof is ConstProofNode) {
-                proofStepsStack.push(labelToInt(curNodeProof.src.label))
+            } else if (curNodeToProcess is Optional<*>) {
+                val calcNode = curNodeToProcess.get() as CalcProofNode
+                proofSteps.add(labelToInt(calcNode.assertion.statement.label))
+                calcNode.dependants.removeIf { it.state != PROVED }
+                if (calcNode.dependants.size > 1) {
+                    calcNode.label = UUID.randomUUID().toString()
+                    savedNodeLabelToInt(calcNode.label!!)
+                    proofSteps.add(SAVE_CURR_VALUE_CMD)
+                }
             } else {
                 throw AssumptionDoesntHoldException()
             }
         }
 
-        val proofSteps = ArrayList<Int>()
-        while (proofStepsStack.isNotEmpty()) {
-            proofSteps.add(proofStepsStack.pop())
+        for (i in proofSteps.indices) {
+            val cmd = proofSteps.get(i)
+            if (cmd < 0 && cmd != SAVE_CURR_VALUE_CMD) {
+                proofSteps.set(i, proofLabels.size + cmd.absoluteValue)
+            }
         }
 
-//        return "\$p " + varProofNode.value.asSequence().map { ctx.getSymbolByNumber(it) }.joinToString(" ") +
-//                " $= ( " + proofLabels.drop(mandatoryHypotheses.size).joinToString(" ") + " ) " +
-//                proofSteps.asSequence().map { intToStr(it) }.joinToString("") + " $."
-        return "111111"
+        return "\$p " + proofNode.stmt.value.asSequence().map { ctx.getSymbolByNumber(it) }.joinToString(" ") +
+                " $= ( " + proofLabels.drop(mandatoryHypotheses.size).joinToString(" ") + " ) " +
+                proofSteps.asSequence().map { intToStr(it) }.joinToString("") + " $."
     }
 
     fun prove(expr: String, ctx: MetamathContext): ProofNode {
@@ -109,7 +132,7 @@ object ProofAssistant {
                 val matchingAssertions = findMatchingAssertions(currStmtToProve.stmt, ctx)
                 for (asrtNode: CalcProofNode in matchingAssertions) {
                     createArgsForCalcNode(asrtNode, proofContext, ctx)
-                    if (asrtNode.args.all { it.state == ProofNodeState.PROVED }) {
+                    if (asrtNode.args.all { it.state == PROVED }) {
                         proofContext.proofFoundForNodeToBeProved(nodeToBeProved = currStmtToProve, foundProof = asrtNode)
                         break
                     } else {
@@ -154,6 +177,9 @@ object ProofAssistant {
     }
 
     private fun intToStr(i: Int): String {
+        if (i == SAVE_CURR_VALUE_CMD) {
+            return "Z"
+        }
         if (i == 0) {
             throw ProofAssistantException("i == 0")
         }
