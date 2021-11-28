@@ -106,15 +106,24 @@ class ProofContext {
         if (proof == null) {
             throw AssumptionDoesntHoldException()
         }
+        if (!pendingNode.stmt.value.contentEquals(proof.stmt.value)) {
+            throw AssumptionDoesntHoldException()
+        }
         proof.dependants.removeIf { it === pendingNode }
         proof.dependants.addAll(pendingNode.dependants)
-        for (dependant in pendingNode.dependants) {
-            if (dependant is CalcProofNode) {
-                // TODO: 11/28/2021 preserve order of args
-                if (!dependant.args.removeIf { it === pendingNode }) {
+        for (dependantOfPendingNode in pendingNode.dependants) {
+            if (dependantOfPendingNode is CalcProofNode) {
+                var replaceCnt = 0
+                var argIdx = dependantOfPendingNode.args.indexOfFirst { it === pendingNode }
+                while (argIdx >= 0) {
+                    dependantOfPendingNode.args.removeAt(argIdx)
+                    dependantOfPendingNode.args.add(argIdx, proof)
+                    replaceCnt++
+                    argIdx = dependantOfPendingNode.args.indexOfFirst { it === pendingNode }
+                }
+                if (replaceCnt < 1) {
                     throw AssumptionDoesntHoldException()
                 }
-                dependant.args.add(proof)
             } else {
                 throw AssumptionDoesntHoldException()
             }
