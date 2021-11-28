@@ -176,23 +176,20 @@ object ProofAssistant {
         }
     }
 
-    private fun intToStr(i: Int): String {
-        if (i == SAVE_CURR_VALUE_CMD) {
+    fun intToStr(iArg: Int): String {
+        if (iArg == SAVE_CURR_VALUE_CMD) {
             return "Z"
         }
-        if (i == 0) {
+        if (iArg == 0) {
             throw ProofAssistantException("i == 0")
         }
-        var i = i
         val sb = StringBuilder()
-        var base = 21
-        //65 is A, 85 is U
+        sb.append((65 + (iArg-1) % 20).toChar())
+        var i = (iArg-1) / 20
         while (i > 0) {
-            sb.append((i % base + if (sb.length == 0) 64 else 85).toChar())
-            i /= base
-            if (base == 21) {
-                base = 6
-            }
+            //85 is U
+            sb.append(((i-1) % 5 + 85).toChar())
+            i = (i-1) / 5
         }
         return sb.reverse().toString()
     }
