@@ -86,18 +86,39 @@ class ProofContext {
     }
 
     fun proofFoundForNodeToBeProved(nodeToBeProved: PendingProofNode, foundProof: ProofNode) {
-        for (dependant in nodeToBeProved.dependants) {
+        replacePendingNodeWithItsProof(pendingNode = nodeToBeProved, proofArg = foundProof)
+        markProved(foundProof)
+        markDependantsAsProved(foundProof)
+    }
+
+    private fun replacePendingNodeWithItsProof(pendingNode: PendingProofNode, proofArg: ProofNode? = null) {
+        cancel(pendingNode)
+        var proof: ProofNode? = proofArg
+        for (p in pendingNode.proofs) {
+            if (!(p.state == PROVED || p === proofArg)) {
+                cancelWithAllChildren(p)
+            } else if (proof == null) {
+                proof = p
+            } else if (p !== proofArg) {
+                throw AssumptionDoesntHoldException()
+            }
+        }
+        if (proof == null) {
+            throw AssumptionDoesntHoldException()
+        }
+        proof.dependants.removeIf { it === pendingNode }
+        proof.dependants.addAll(pendingNode.dependants)
+        for (dependant in pendingNode.dependants) {
             if (dependant is CalcProofNode) {
-                dependant.args.removeIf { it == nodeToBeProved }
-                dependant.args.add(foundProof)
+                // TODO: 11/28/2021 preserve order of args
+                if (!dependant.args.removeIf { it === pendingNode }) {
+                    throw AssumptionDoesntHoldException()
+                }
+                dependant.args.add(proof)
             } else {
                 throw AssumptionDoesntHoldException()
             }
         }
-        cancel(nodeToBeProved)
-        markProved(foundProof)
-        foundProof.dependants.addAll(nodeToBeProved.dependants)
-        markDependantsAsProved(foundProof)
     }
 
     private fun markDependantsAsProved(provedNode: ProofNode) {
@@ -115,48 +136,23 @@ class ProofContext {
             }
             val newNodesToBeMarkedAsProved: List<ProofNode> = when (currNode) {
                 is PendingProofNode -> {
-                    cancel(currNode)
-                    var proof: ProofNode? = null
-                    for (p in currNode.proofs) {
-                        if (p.state == PROVED) {
-                            if (proof == null) {
-                                proof = p
-                            } else {
-                                throw AssumptionDoesntHoldException()
-                            }
-                        } else {
-                            cancelWithAllChildren(p)
-                        }
-                    }
-                    if (proof == null) {
-                        throw AssumptionDoesntHoldException()
-                    }
-                    proof.dependants.removeIf { it === currNode }
-                    proof.dependants.addAll(currNode.dependants)
-                    for (dependant in currNode.dependants) {
-                        if (dependant is CalcProofNode) {
-                            if (!dependant.args.removeIf { it === currNode }) {
-                                throw AssumptionDoesntHoldException()
-                            }
-                            dependant.args.add(proof)
-                        } else {
-                            throw AssumptionDoesntHoldException()
-                        }
-                    }
+                    replacePendingNodeWithItsProof(pendingNode = currNode)
                     currNode.dependants
                 }
                 is CalcProofNode -> {
                     if (currNode.args.all { it.state == PROVED }) {
-                        for (dependant in currNode.dependants) {
-                            if (dependant is PendingProofNode) {
-                                //all the dependants will be processed on the next step
-                                cancel(dependant)
+                        val allGrandDependants = ArrayList<ProofNode>()
+                        val directDependantsOfCurrNode = ArrayList(currNode.dependants)
+                        for (directDependant in directDependantsOfCurrNode) {
+                            if (directDependant is PendingProofNode) {
+                                replacePendingNodeWithItsProof(pendingNode = directDependant, proofArg = currNode)
+                                allGrandDependants.addAll(directDependant.dependants)
                             } else {
                                 throw AssumptionDoesntHoldException()
                             }
                         }
                         markProved(currNode)
-                        currNode.dependants
+                        allGrandDependants
                     } else {
                         emptyList()
                     }
@@ -175,6 +171,9 @@ class ProofContext {
         rootsToStartCancellingFrom.add(node)
         while (rootsToStartCancellingFrom.isNotEmpty()) {
             val currNode = rootsToStartCancellingFrom.removeLast()
+            if (currNode.state == PROVED) {
+                continue
+            }
             cancel(currNode)
             rootsToStartCancellingFrom.addAll(when (currNode) {
                 is CalcProofNode -> currNode.args

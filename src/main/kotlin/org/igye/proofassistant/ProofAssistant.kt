@@ -31,10 +31,10 @@ fun main() {
 
 object ProofAssistant {
 
-    fun createProvableAssertion(varProofNode: ProofNode, ctx: MetamathContext): String {
+    fun createProvableAssertion(proofNode: ProofNode, ctx: MetamathContext): String {
         val essentialHypotheses: List<Statement> = ctx.getHypotheses { it.type == 'e'}
-        val variables = collectAllVariables(essentialHypotheses, varProofNode.stmt.value)
-        val (floatingHypotheses, variablesTypes) = MetamathUtils.collectFloatingHypotheses(variables, ctx)
+        val variables = collectAllVariables(essentialHypotheses, proofNode.stmt.value)
+        val (floatingHypotheses, _) = MetamathUtils.collectFloatingHypotheses(variables, ctx)
         val mandatoryHypotheses: List<Statement> = (floatingHypotheses + essentialHypotheses).sortedBy { it.beginIdx }
 
         val proofLabels: MutableList<String> = ArrayList(mandatoryHypotheses.map { it.label })
@@ -53,18 +53,21 @@ object ProofAssistant {
 
         val proofStepsStack = Stack<Int>()
         val nodesToProcess = Stack<ProofNode>()
-        nodesToProcess.push(varProofNode)
-//        while (nodesToProcess.isNotEmpty()) {
-//            val curNodeProof = nodesToProcess.pop().proofs[0]
-//            if (curNodeProof is CalculatedProofNode) {
-//                proofStepsStack.push(labelToInt(curNodeProof.assertion.statement.label))
-//                curNodeProof.args.forEach { nodesToProcess.push(it) }
-//            } else if (curNodeProof is ConstProofNode) {
-//                proofStepsStack.push(labelToInt(curNodeProof.stmt.label))
-//            } else {
-//                throw ProofAssistantException("Unexpected type of curNodeProof: " + curNodeProof.javaClass.canonicalName)
-//            }
-//        }
+        nodesToProcess.push(proofNode)
+        while (nodesToProcess.isNotEmpty()) {
+            val curNodeProof = nodesToProcess.pop()
+            if (curNodeProof is CalcProofNode) {
+                if (curNodeProof.dependants.size > 1) {
+
+                }
+                proofStepsStack.push(labelToInt(curNodeProof.assertion.statement.label))
+                curNodeProof.args.forEach { nodesToProcess.push(it) }
+            } else if (curNodeProof is ConstProofNode) {
+                proofStepsStack.push(labelToInt(curNodeProof.src.label))
+            } else {
+                throw AssumptionDoesntHoldException()
+            }
+        }
 
         val proofSteps = ArrayList<Int>()
         while (proofStepsStack.isNotEmpty()) {
