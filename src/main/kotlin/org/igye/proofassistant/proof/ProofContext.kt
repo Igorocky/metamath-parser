@@ -141,7 +141,7 @@ class ProofContext {
         while (toBeMarkedAsProved.isNotEmpty()) {
             val currNode = toBeMarkedAsProved.pop()
             if (currNode.state == PROVED) {
-                throw AssumptionDoesntHoldException()
+                continue
             }
             val newNodesToBeMarkedAsProved: List<ProofNode> = when (currNode) {
                 is PendingProofNode -> {
