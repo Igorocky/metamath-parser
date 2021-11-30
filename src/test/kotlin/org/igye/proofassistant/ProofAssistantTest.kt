@@ -63,11 +63,11 @@ internal class ProofAssistantTest {
             expectedProof = "",
             ctx = ctx
         )
-        testCompressedProof(
-            expr = "",
-            expectedProof = "",
-            ctx = ctx
-        )
+//        testCompressedProof(
+//            expr = "",
+//            expectedProof = "",
+//            ctx = ctx
+//        )
     }
 
     private fun testCompressedProof(expr: String, expectedProof: String, ctx: MetamathContext) {

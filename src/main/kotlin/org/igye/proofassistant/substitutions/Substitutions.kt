@@ -262,6 +262,9 @@ object Substitutions {
             return consumer(constParts, matchingConstParts)
         } else {
             if (idxToMatch == 0 && constParts.begins[idxToMatch] == 0) {
+                if (stmt.size-1 < constParts.ends[idxToMatch]) {
+                    return CONTINUE
+                }
                 for (i in 0 .. constParts.ends[idxToMatch]) {
                     if (asrtStmt[i] != stmt[i]) {
                         return CONTINUE
