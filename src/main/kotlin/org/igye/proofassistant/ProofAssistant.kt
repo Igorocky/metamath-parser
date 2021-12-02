@@ -80,8 +80,8 @@ object ProofAssistant {
             } else if (curNodeToProcess is Optional<*>) {
                 val calcNode = curNodeToProcess.get() as CalcProofNode
                 proofSteps.add(labelToInt(calcNode.assertion.statement.label))
-                calcNode.dependants.removeIf { it.state != PROVED }
-                if (calcNode.dependants.size > 1) {
+                calcNode.removeDependantIf { it.state != PROVED }
+                if (calcNode.getDependants().size > 1) {
                     calcNode.label = UUID.randomUUID().toString()
                     savedNodeLabelToInt(calcNode.label!!)
                     proofSteps.add(SAVE_CURR_VALUE_CMD)
@@ -137,7 +137,7 @@ object ProofAssistant {
                         break
                     } else {
                         currStmtToProve.proofs.add(asrtNode)
-                        asrtNode.dependants.add(currStmtToProve)
+                        asrtNode.addDependant(currStmtToProve)
                         asrtNode.state = ProofNodeState.WAITING
                     }
                 }
@@ -158,18 +158,18 @@ object ProofAssistant {
                 ?: proofContext.getWaiting(argStmt)
                 ?: proofContext.getToBeProved(argStmt)
             if (existingProof != null) {
-                existingProof.dependants.add(asrtNode)
+                existingProof.addDependant(asrtNode)
                 asrtNode.args.add(existingProof)
             } else {
                 val constProof = findConstant(argStmt, ctx)
                 if (constProof != null) {
                     proofContext.markProved(constProof)
-                    constProof.dependants.add(asrtNode)
+                    constProof.addDependant(asrtNode)
                     asrtNode.args.add(constProof)
                 } else {
                     val pendingNode = PendingProofNode(stmt = argStmt)
                     proofContext.addStatementToProve(pendingNode)
-                    pendingNode.dependants.add(asrtNode)
+                    pendingNode.addDependant(asrtNode)
                     asrtNode.args.add(pendingNode)
                 }
             }
