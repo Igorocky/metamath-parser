@@ -2,27 +2,41 @@ package org.igye.proofassistant.proof
 
 import org.igye.proofassistant.proof.ProofNodeState.*
 import org.igye.proofassistant.proof.prooftree.*
+import java.lang.Integer.min
 import java.util.*
 import kotlin.collections.ArrayList
 import kotlin.collections.HashMap
 
-class ProofContext {
-    private val statementsToProve: MutableMap<Stmt, PendingProofNode> = HashMap()
-    private val waitingStatements: MutableMap<Stmt, ProofNode> = HashMap()
+class ProofContext(val target: PendingProofNode) {
+    private val newStatements: MutableMap<Stmt, PendingProofNode> = HashMap()
+    private val waitingStatements: MutableMap<Stmt, PendingProofNode> = HashMap()
     private val provedStatements: MutableMap<Stmt, ProofNode> = HashMap()
 
-    fun hasStatementsToProve(): Boolean = statementsToProve.isNotEmpty()
+    init {
+        addNewStatement(target)
+    }
 
-    fun getNextStatementToProve(): PendingProofNode = statementsToProve.iterator().next().value
+    fun hasNewStatements(): Boolean = newStatements.isNotEmpty()
+
+    fun getNextStatementToProve(): PendingProofNode {
+        updateDist(target)
+        val minByOrNull = newStatements.values.asSequence()
+            .filter { it.dist >= 0 && it.dist < Int.MAX_VALUE }
+            .minByOrNull { it.dist }
+        if (minByOrNull == null) {
+            throw AssumptionDoesntHoldException()
+        }
+        return minByOrNull!!
+    }
 
     fun getProved(stmt: Stmt): ProofNode? = provedStatements[stmt]
 
     fun getWaiting(stmt: Stmt): ProofNode? = waitingStatements[stmt]
 
-    fun getToBeProved(stmt: Stmt): ProofNode? = statementsToProve[stmt]
+    fun getNew(stmt: Stmt): ProofNode? = newStatements[stmt]
 
-    fun addStatementToProve(node: PendingProofNode) {
-        if (statementsToProve.put(node.stmt, node) != null) {
+    fun addNewStatement(node: PendingProofNode) {
+        if (newStatements.put(node.stmt, node) != null) {
             throw AssumptionDoesntHoldException()
         }
         if (waitingStatements.contains(node.stmt)) {
@@ -31,15 +45,12 @@ class ProofContext {
         if (provedStatements.contains(node.stmt)) {
             throw AssumptionDoesntHoldException()
         }
-        node.state = TO_BE_PROVED
+        node.state = NEW
     }
 
-    fun markWaiting(node: ProofNode) {
-        if (!(node is CalcProofNode || node is PendingProofNode)) {
-            throw AssumptionDoesntHoldException()
-        }
-        val toBeProved = statementsToProve.remove(node.stmt)
-        if (toBeProved !== null && toBeProved !== node) {
+    fun markWaiting(node: PendingProofNode) {
+        val new = newStatements.remove(node.stmt)
+        if (new !== null && new !== node) {
             throw AssumptionDoesntHoldException()
         }
         val prevWaitingNode = waitingStatements.put(node.stmt, node)
@@ -56,8 +67,8 @@ class ProofContext {
         if (!(node is ConstProofNode || node is CalcProofNode)) {
             throw AssumptionDoesntHoldException()
         }
-        val toBeProved = statementsToProve.remove(node.stmt)
-        if (toBeProved !== null && toBeProved !== node) {
+        val new = newStatements.remove(node.stmt)
+        if (new !== null && new !== node) {
             throw AssumptionDoesntHoldException()
         }
         val waiting = waitingStatements.remove(node.stmt)
@@ -70,37 +81,33 @@ class ProofContext {
         node.state = PROVED
     }
 
-    private fun cancel(node: ProofNode) {
-        if (node is ConstProofNode || node.state == PROVED) {
-            return
-        }
-        val toBeProved = statementsToProve.remove(node.stmt)
-        if (toBeProved !== null && toBeProved !== node) {
+    fun remove(node: ProofNode) {
+        if (newStatements.remove(node.stmt) !== node && waitingStatements.remove(node.stmt) !== node) {
             throw AssumptionDoesntHoldException()
         }
-        val waiting = waitingStatements.remove(node.stmt)
-        if (waiting !== null && waiting !== node) {
-            throw AssumptionDoesntHoldException()
-        }
-        node.state = CANCELLED
+        node.state = REMOVED
     }
 
     fun proofFoundForNodeToBeProved(nodeToBeProved: PendingProofNode, foundProof: ProofNode) {
         replacePendingNodeWithItsProof(pendingNode = nodeToBeProved, proofArg = foundProof)
-        markProved(foundProof)
         markDependantsAsProved(foundProof)
     }
 
-    private fun replacePendingNodeWithItsProof(pendingNode: PendingProofNode, proofArg: ProofNode? = null) {
-        cancel(pendingNode)
+    private fun replacePendingNodeWithItsProof(pendingNode: PendingProofNode, proofArg: ProofNode? = null): ProofNode {
+        remove(pendingNode)
         var proof: ProofNode? = proofArg
         for (p in pendingNode.proofs) {
-            if (!(p.state == PROVED || p === proofArg)) {
-                cancelWithAllChildren(p)
-            } else if (proof == null) {
-                proof = p
-            } else if (p !== proofArg) {
-                throw AssumptionDoesntHoldException()
+            if (p.state == PROVED || p === proofArg) {
+                if (proof == null) {
+                    proof = p
+                } else if (p !== proofArg) {
+                    throw AssumptionDoesntHoldException()
+                }
+            } else {
+                p.removeDependantIf { true }
+                for (a in p.args) {
+                    a.removeDependantIf { it === p }
+                }
             }
         }
         if (proof == null) {
@@ -128,9 +135,17 @@ class ProofContext {
                 throw AssumptionDoesntHoldException()
             }
         }
+        pendingNode.removeDependantIf { true }
+        if (proof.state != PROVED) {
+            markProved(proof)
+        }
+        return proof
     }
 
     private fun markDependantsAsProved(provedNode: ProofNode) {
+        if (!(provedNode is CalcProofNode || provedNode is ConstProofNode)) {
+            throw AssumptionDoesntHoldException()
+        }
         val toBeMarkedAsProved: Stack<ProofNode> = Stack()
         provedNode.getDependants().forEach {
             if (it.state == PROVED) {
@@ -145,23 +160,19 @@ class ProofContext {
             }
             val newNodesToBeMarkedAsProved: List<ProofNode> = when (currNode) {
                 is PendingProofNode -> {
-                    replacePendingNodeWithItsProof(pendingNode = currNode)
-                    currNode.getDependants()
+                    replacePendingNodeWithItsProof(pendingNode = currNode).getDependants()
                 }
                 is CalcProofNode -> {
                     if (currNode.args.all { it.state == PROVED }) {
-                        val allGrandDependants = ArrayList<ProofNode>()
                         val directDependantsOfCurrNode = ArrayList(currNode.getDependants())
                         for (directDependant in directDependantsOfCurrNode) {
                             if (directDependant is PendingProofNode) {
                                 replacePendingNodeWithItsProof(pendingNode = directDependant, proofArg = currNode)
-                                allGrandDependants.addAll(directDependant.getDependants())
                             } else {
                                 throw AssumptionDoesntHoldException()
                             }
                         }
-                        markProved(currNode)
-                        allGrandDependants
+                        currNode.getDependants()
                     } else {
                         emptyList()
                     }
@@ -172,24 +183,33 @@ class ProofContext {
         }
     }
 
-    private fun cancelWithAllChildren(node: ProofNode) {
-        if (node is ConstProofNode) {
-            return
+    private fun updateDist(root: PendingProofNode) {
+        newStatements.values.forEach { it.dist = -1 }
+        waitingStatements.values.forEach {
+            it.dist = -1
+            it.proofs.forEach { it.dist = -1 }
         }
-        val rootsToStartCancellingFrom = ArrayList<ProofNode>()
-        rootsToStartCancellingFrom.add(node)
-        while (rootsToStartCancellingFrom.isNotEmpty()) {
-            val currNode = rootsToStartCancellingFrom.removeLast()
-            if (currNode.state == PROVED) {
+        provedStatements.values.forEach { it.dist = -1 }
+        root.dist = 0
+        val nodesToUpdateDist = LinkedList<ProofNode>()
+        nodesToUpdateDist.addAll(root.proofs)
+        while (nodesToUpdateDist.isNotEmpty()) {
+            val currNode = nodesToUpdateDist.removeFirst()
+            if (currNode.dist >= 0) {
                 continue
-            } else if (currNode.state != CANCELLED) {
-                cancel(currNode)
             }
-            rootsToStartCancellingFrom.addAll(when (currNode) {
-                is CalcProofNode -> currNode.args
-                is PendingProofNode -> currNode.proofs
-                is ConstProofNode -> emptyList()
-            })
+            var newDist = Int.MAX_VALUE
+            for (dep in currNode.getDependants()) {
+                newDist = min(newDist, if (dep.dist < 0) Int.MAX_VALUE else dep.dist)
+            }
+            currNode.dist = if (newDist == Int.MAX_VALUE) Int.MAX_VALUE else newDist + 1
+            nodesToUpdateDist.addAll(
+                when (currNode) {
+                    is CalcProofNode -> currNode.args
+                    is PendingProofNode -> currNode.proofs
+                    is ConstProofNode -> emptyList()
+                }
+            )
         }
     }
 }

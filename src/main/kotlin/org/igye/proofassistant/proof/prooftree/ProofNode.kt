@@ -3,36 +3,25 @@ package org.igye.proofassistant.proof.prooftree
 import org.igye.common.MetamathUtils
 import org.igye.metamathparser.Assertion
 import org.igye.metamathparser.Statement
-import org.igye.proofassistant.proof.AssumptionDoesntHoldException
 import org.igye.proofassistant.proof.ProofNodeState
 import org.igye.proofassistant.proof.Stmt
 import java.util.*
-import java.util.function.Predicate
-import kotlin.collections.ArrayList
 
 sealed class ProofNode(val stmt: Stmt) {
-    var state: ProofNodeState = ProofNodeState.TO_BE_PROVED
+    var state: ProofNodeState = ProofNodeState.NEW
+    var dist: Int = -1
     private val dependants: MutableList<ProofNode> = ArrayList()
 
-    fun removeDependantIf(predicate: Predicate<ProofNode>) {
+    fun removeDependantIf(predicate: (ProofNode) -> Boolean) {
         dependants.removeIf(predicate)
     }
 
     fun addDependants(newDependants: Collection<ProofNode>) {
-        for (newDep in newDependants) {
-            addDependant(newDep)
-        }
+        dependants.addAll(newDependants)
     }
 
     fun addDependant(newDep: ProofNode) {
-        if (!canAddDependant(newDep)) {
-            throw AssumptionDoesntHoldException()
-        }
         dependants.add(newDep)
-    }
-
-    private fun canAddDependant(newDep: ProofNode): Boolean {
-        return true
     }
 
     fun getDependants(): List<ProofNode> {
@@ -58,5 +47,5 @@ class CalcProofNode(
 }
 
 class PendingProofNode(stmt: Stmt):ProofNode(stmt = stmt) {
-    val proofs: MutableList<ProofNode> = ArrayList()
+    val proofs: MutableList<CalcProofNode> = ArrayList()
 }

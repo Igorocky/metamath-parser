@@ -13,6 +13,7 @@ import org.igye.metamathparser.Parsers.parseMetamathFile
 import org.igye.metamathparser.Statement
 import org.igye.proofassistant.proof.*
 import org.igye.proofassistant.proof.ProofNodeState.PROVED
+import org.igye.proofassistant.proof.ProofNodeState.WAITING
 import org.igye.proofassistant.proof.prooftree.CalcProofNode
 import org.igye.proofassistant.proof.prooftree.ConstProofNode
 import org.igye.proofassistant.proof.prooftree.PendingProofNode
@@ -119,10 +120,9 @@ object ProofAssistant {
             squareBracketClose = ctx.getNumberBySymbol("]"),
         )
 
-        val proofContext = ProofContext()
-        proofContext.addStatementToProve(PendingProofNode(stmt = stmtToProve))
+        val proofContext = ProofContext(PendingProofNode(stmt = stmtToProve))
 
-        while (proofContext.getProved(stmtToProve) == null && proofContext.hasStatementsToProve()) {
+        while (proofContext.getProved(stmtToProve) == null && proofContext.hasNewStatements()) {
             val currStmtToProve: PendingProofNode = proofContext.getNextStatementToProve()
 
             val constProof = findConstant(currStmtToProve.stmt, ctx)
@@ -138,12 +138,12 @@ object ProofAssistant {
                     } else {
                         currStmtToProve.proofs.add(asrtNode)
                         asrtNode.addDependant(currStmtToProve)
-                        asrtNode.state = ProofNodeState.WAITING
+                        asrtNode.state = WAITING
                     }
                 }
             }
 
-            if (currStmtToProve.state == ProofNodeState.TO_BE_PROVED) {
+            if (currStmtToProve.state == ProofNodeState.NEW) {
                 proofContext.markWaiting(currStmtToProve)
             }
         }
@@ -156,7 +156,7 @@ object ProofAssistant {
             val argStmt = mkStmt(applySubstitution(arg.content, asrtNode.substitution), ctx)
             val existingProof = proofContext.getProved(argStmt)
                 ?: proofContext.getWaiting(argStmt)
-                ?: proofContext.getToBeProved(argStmt)
+                ?: proofContext.getNew(argStmt)
             if (existingProof != null) {
                 existingProof.addDependant(asrtNode)
                 asrtNode.args.add(existingProof)
@@ -168,7 +168,7 @@ object ProofAssistant {
                     asrtNode.args.add(constProof)
                 } else {
                     val pendingNode = PendingProofNode(stmt = argStmt)
-                    proofContext.addStatementToProve(pendingNode)
+                    proofContext.addNewStatement(pendingNode)
                     pendingNode.addDependant(asrtNode)
                     asrtNode.args.add(pendingNode)
                 }
