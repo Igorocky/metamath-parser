@@ -2,6 +2,7 @@ package org.igye.proofassistant.substitutions
 
 import org.igye.common.ContinueInstr
 import org.igye.metamathparser.*
+import org.igye.proofassistant.ProofAssistant
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -287,29 +288,15 @@ internal class SubstitutionsTest {
     @Test
     fun iterateSubstitutions_finds_all_substitution_in_set_mm() {
         //given
-        val assertions: Map<String, Assertion> =
-            Parsers.parseMetamathFile(
-                text = File("C:\\igye\\books\\metamath/set.mm").readText(), rootContext = MetamathContext(), exprProc = ExpressionProcessor
-            ).getAssertions()
+        val ctx: MetamathContext = Parsers.parseMetamathFile(
+            text = File("C:\\igye\\books\\metamath/set.mm").readText(),
+            rootContext = MetamathContext(),
+            exprProc = ExpressionProcessor
+        )
+        ProofAssistant.initProofAssistantData(ctx)
+        val assertions: Map<String, Assertion> = ctx.getAssertions()
 
-        var parentheses = HashMap<String,Int>()
-        for ((_,a) in assertions) {
-            for((i,s) in a.visualizationData.symbolsMap) {
-                if ("(" == s || ")" == s || "{" == s || "}" == s || "[" == s || "]" == s) {
-                    parentheses[s]=i
-                }
-            }
-        }
-        parenCounterProducer = {
-            ParenthesesCounter(
-                roundBracketOpen = parentheses["("]!!,
-                roundBracketClose = parentheses[")"]!!,
-                curlyBracketOpen = parentheses["{"]!!,
-                curlyBracketClose = parentheses["}"]!!,
-                squareBracketOpen = parentheses["["]!!,
-                squareBracketClose = parentheses["]"]!!,
-            )
-        }
+        parenCounterProducer = ctx.parentheses::createParenthesesCounter
 
         val theorems = assertions.asSequence()
             .filter { it.value.statement.type == 'p' }

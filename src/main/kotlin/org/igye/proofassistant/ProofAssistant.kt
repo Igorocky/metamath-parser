@@ -104,16 +104,8 @@ object ProofAssistant {
                 proofSteps.asSequence().map { intToStr(it) }.joinToString("") + " $."
     }
 
-    fun prove(expr: String, ctx: MetamathContext): ProofNode {
-        val allowedStatementsTypes: Set<Int> = setOf("wff", "setvar", "class").map { ctx.getNumberBySymbol(it) }.toSet()
-        val stmtToProve = mkStmt(expr, ctx)
-        if (!allowedStatementsTypes.contains(stmtToProve.value[0])) {
-            throw MetamathParserException("!allowedStatementsTypes.contains(result.value[0])")
-        }
-
-        val proofContext = ProofContext(PendingProofNode(stmt = stmtToProve))
-        val allAssertions: Collection<Assertion> = ctx.getAssertions().values
-        for (asrt in allAssertions) {
+    fun initProofAssistantData(ctx: MetamathContext) {
+        for (asrt in ctx.getAssertions().values) {
             val asrtStmt = asrt.statement.content
             val constParts: ConstParts = Substitutions.createConstParts(asrtStmt)
             val matchingConstParts = Substitutions.createMatchingConstParts(
@@ -125,6 +117,20 @@ object ProofAssistant {
                 matchingConstParts = matchingConstParts,
                 varGroups = Substitutions.createVarGroups(asrtStmt = asrtStmt, constParts = constParts)
             )
+        }
+    }
+
+    fun prove(expr: String, ctx: MetamathContext): ProofNode {
+        val allowedStatementsTypes: Set<Int> = setOf("wff", "setvar", "class").map { ctx.getNumberBySymbol(it) }.toSet()
+        val stmtToProve = mkStmt(expr, ctx)
+        if (!allowedStatementsTypes.contains(stmtToProve.value[0])) {
+            throw MetamathParserException("!allowedStatementsTypes.contains(result.value[0])")
+        }
+
+        val proofContext = ProofContext(PendingProofNode(stmt = stmtToProve))
+        val allAssertions: Collection<Assertion> = ctx.getAssertions().values
+        if (allAssertions.first().proofAssistantData == null) {
+            initProofAssistantData(ctx)
         }
         val parenCounterProducer = ctx.parentheses::createParenthesesCounter
 
