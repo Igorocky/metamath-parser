@@ -114,13 +114,16 @@ object ProofAssistant {
         val proofContext = ProofContext(PendingProofNode(stmt = stmtToProve))
         val allAssertions: Collection<Assertion> = ctx.getAssertions().values
         for (asrt in allAssertions) {
-            val constParts: ConstParts = Substitutions.createConstParts(asrt.statement.content)
+            val asrtStmt = asrt.statement.content
+            val constParts: ConstParts = Substitutions.createConstParts(asrtStmt)
+            val matchingConstParts = Substitutions.createMatchingConstParts(
+                constParts,
+                ctx.parentheses::createParenthesesCounter
+            )
             asrt.proofAssistantData = ProofAssistantData(
                 constParts = constParts,
-                matchingConstParts = Substitutions.createMatchingConstParts(
-                    constParts,
-                    ctx.parentheses::createParenthesesCounter
-                ),
+                matchingConstParts = matchingConstParts,
+                varGroups = Substitutions.createVarGroups(asrtStmt = asrtStmt, constParts = constParts)
             )
         }
         val parenCounterProducer = ctx.parentheses::createParenthesesCounter
@@ -230,6 +233,7 @@ object ProofAssistant {
                     parenCounterProducer = parenCounterProducer,
                     constParts = proofAssistantData.constParts,
                     matchingConstParts = proofAssistantData.matchingConstParts,
+                    varGroups = proofAssistantData.varGroups,
                 ) { subs ->
                     if (subs.begins.size == assertion.numberOfVariables && subs.isDefined.all { it }) {
                         val subsList = ArrayList<IntArray>(subs.begins.size)

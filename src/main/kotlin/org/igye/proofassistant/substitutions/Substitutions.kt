@@ -17,6 +17,7 @@ object Substitutions {
         }
         val constParts: ConstParts = createConstParts(asrtStmt)
         val matchingConstParts: ConstParts = createMatchingConstParts(constParts, parenCounterProducer)
+        val varGroups = createVarGroups(asrtStmt = asrtStmt, constParts = constParts)
         iterateSubstitutions(
             stmt = stmt,
             asrtStmt = asrtStmt,
@@ -24,6 +25,7 @@ object Substitutions {
             parenCounterProducer = parenCounterProducer,
             constParts = constParts,
             matchingConstParts = matchingConstParts,
+            varGroups = varGroups,
             consumer = consumer,
         )
     }
@@ -35,6 +37,7 @@ object Substitutions {
         parenCounterProducer: () -> ParenthesesCounter,
         constParts: ConstParts,
         matchingConstParts: ConstParts,
+        varGroups: MutableList<VarGroup>,
         consumer: ((Substitution) -> ContinueInstr),
     ) {
         // TODO: 11/27/2021 check stmt length before proceeding
@@ -58,7 +61,13 @@ object Substitutions {
                 matchingConstParts = matchingConstParts,
                 idxToMatch = 0,
             ) { constParts: ConstParts, matchingConstParts: ConstParts ->
-                val varGroups = createVarGroups(stmt, asrtStmt, constParts, matchingConstParts)
+                initVarGroups(
+                    stmt = stmt,
+                    asrtStmt = asrtStmt,
+                    constParts = constParts,
+                    matchingConstParts = matchingConstParts,
+                    varGroups = varGroups,
+                )
                 val subs = Substitution(
                     stmt = stmt,
                     begins = IntArray(numOfVars),
@@ -155,7 +164,7 @@ object Substitutions {
         return continueInstr
     }
 
-    private fun createVarGroups(stmt:IntArray, asrtStmt:IntArray, constParts: ConstParts, matchingConstParts: ConstParts):List<VarGroup> {
+    fun createVarGroups(asrtStmt:IntArray, constParts: ConstParts):MutableList<VarGroup> {
         val result = ArrayList<VarGroup>()
         if (constParts.size == 0) {
             result.add(
@@ -163,9 +172,6 @@ object Substitutions {
                     asrtStmt = asrtStmt,
                     numOfVars = asrtStmt.size,
                     varsBeginIdx = 0,
-                    exprBeginIdx = 0,
-                    exprEndIdx = stmt.size-1,
-                    level = 0
                 )
             )
         } else {
@@ -175,8 +181,6 @@ object Substitutions {
                         asrtStmt = asrtStmt,
                         numOfVars = constParts.begins[0],
                         varsBeginIdx = 0,
-                        exprBeginIdx = 0,
-                        exprEndIdx = matchingConstParts.begins[0]
                     )
                 )
             }
@@ -186,8 +190,6 @@ object Substitutions {
                         asrtStmt = asrtStmt,
                         numOfVars = constParts.begins[i+1] - constParts.ends[i] - 1,
                         varsBeginIdx = constParts.ends[i]+1,
-                        exprBeginIdx = matchingConstParts.ends[i]+1,
-                        exprEndIdx = matchingConstParts.begins[i+1]-1
                     )
                 )
             }
@@ -198,19 +200,50 @@ object Substitutions {
                         asrtStmt = asrtStmt,
                         numOfVars = asrtStmt.size - constParts.ends[lastConstPart] - 1,
                         varsBeginIdx = constParts.ends[lastConstPart]+1,
-                        exprBeginIdx = matchingConstParts.ends[lastConstPart]+1,
-                        exprEndIdx = stmt.size-1
                     )
                 )
             }
-            Collections.sort(result, compareBy { it.numberOfStates })
-            var level = 0
-            for (varGroup in result) {
-                varGroup.level=level
-                level+=varGroup.numOfVars
-            }
         }
         return result
+    }
+
+    private fun initVarGroups(stmt:IntArray, asrtStmt:IntArray, constParts: ConstParts, matchingConstParts: ConstParts, varGroups: MutableList<VarGroup>) {
+        if (constParts.size == 0) {
+            varGroups[0].init(
+                numOfVars = asrtStmt.size,
+                varsBeginIdx = 0,
+                exprBeginIdx = 0,
+                exprEndIdx = stmt.size-1,
+            )
+        } else {
+            var g = 0
+            if (constParts.begins[0] > 0) {
+                varGroups[g++].init(
+                    numOfVars = constParts.begins[0],
+                    varsBeginIdx = 0,
+                    exprBeginIdx = 0,
+                    exprEndIdx = matchingConstParts.begins[0]
+                )
+            }
+            for (i in 0 .. constParts.size-2) {
+                varGroups[g++].init(
+                    numOfVars = constParts.begins[i+1] - constParts.ends[i] - 1,
+                    varsBeginIdx = constParts.ends[i]+1,
+                    exprBeginIdx = matchingConstParts.ends[i]+1,
+                    exprEndIdx = matchingConstParts.begins[i+1]-1
+                )
+            }
+            val lastConstPart = constParts.size-1
+            if (constParts.ends[lastConstPart] != asrtStmt.size-1) {
+                varGroups[g].init(
+                    numOfVars = asrtStmt.size - constParts.ends[lastConstPart] - 1,
+                    varsBeginIdx = constParts.ends[lastConstPart]+1,
+                    exprBeginIdx = matchingConstParts.ends[lastConstPart]+1,
+                    exprEndIdx = stmt.size-1
+                )
+            }
+            Collections.sort(varGroups, compareBy { it.numberOfStates })
+        }
     }
 
     fun createMatchingConstParts(constParts: ConstParts, parenCounterProducer: () -> ParenthesesCounter): ConstParts {
