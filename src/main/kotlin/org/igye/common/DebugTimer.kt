@@ -1,6 +1,5 @@
 package org.igye.common
 
-
 import java.math.BigDecimal
 import java.math.RoundingMode
 import java.util.*
@@ -49,40 +48,79 @@ object DebugTimer {
         return accumulatedDurations
     }
 
-    fun getStatsStr(totalTimeLabel:String = ""): String {
+    fun getStatsStr(totalTimeLabel:String = "", grouping: Pair<String,List<Any>>? = null): String {
         val stats: Map<String, Pair<Long, List<Long>>> = getStats()
-        val total: Long? = stats[totalTimeLabel]?.first
-        return stats.entries.asSequence()
-            .sortedByDescending { it.key.first() }
-            .map { (label, duration) ->
-                "$label - ${getPct(duration.first, total)}${nanosToSeconds(duration.first)}s" +
-                        if (duration.second.size > 1) {
-                            duration.second.asSequence()
-                                .map { nanosToSeconds(it) }
-                                .sortedDescending()
-                                .map(Objects::toString)
-                                .joinToString(separator = ", ", prefix = " [", postfix = "]")
-                        } else {
-                            ""
-                        }
+        if (grouping != null) {
+            val totalNanos: Long? = stats[grouping.first]?.first
+            val sb = StringBuilder()
+            val stack = Stack<NodeInfo>()
+            stack.push(NodeInfo(level = 0, label = grouping.first,children = grouping.second as List<Pair<String, List<Any>>>))
+            while (stack.isNotEmpty()) {
+                val curr = stack.pop()
+                sb.append("\n")
+                if (curr.level > 1) {
+                    sb.append("|   ".repeat((curr.level-1)))
+                }
+                if (curr.level > 0) {
+                    if (!stack.isEmpty() && stack.peek().level == curr.level) {
+                        sb.append("|")
+                    } else {
+                        sb.append("\\")
+                    }
+                    sb.append("---")
+                }
+                sb.append("${getPct(stats[curr.label]?.first, totalNanos)}${nanosToSeconds(stats[curr.label]?.first)}s ${curr.label}")
+                curr.children.asSequence()
+                    .sortedBy { stats[it.first]?.first?:0 }
+                    .forEach {
+                        stack.push(NodeInfo(
+                            level = curr.level+1,
+                            label = it.first,
+                            children = it.second as List<Pair<String, List<Any>>>
+                        ))
+                    }
             }
-            .joinToString("\n")
+            return sb.toString()
+        } else {
+            val totalNanos: Long? = stats[totalTimeLabel]?.first
+            return stats.entries.asSequence()
+                .sortedByDescending { it.key.first() }
+                .map { (label, duration) ->
+                    "$label - ${getPct(duration.first, totalNanos)}${nanosToSeconds(duration.first)}s" +
+                            if (duration.second.size > 1) {
+                                duration.second.asSequence()
+                                    .map { nanosToSeconds(it) }
+                                    .sortedDescending()
+                                    .map(Objects::toString)
+                                    .joinToString(separator = ", ", prefix = " [", postfix = "]")
+                            } else {
+                                ""
+                            }
+                }
+                .joinToString("\n")
+        }
     }
 
-    private fun getPct(value:Long, total:Long?): String {
+    private fun getPct(value:Long?, total:Long?): String {
         if (total == null) {
             return ""
         } else {
-            return BigDecimal(value).setScale(10)
+            return BigDecimal(value?:0).setScale(10)
                 .divide(BigDecimal(total), RoundingMode.HALF_UP)
                 .times(BigDecimal(100))
                 .setScale(0, RoundingMode.HALF_UP).toString() + "% "
         }
     }
 
-    private fun nanosToSeconds(nanos: Long): BigDecimal {
-        return BigDecimal(nanos).setScale(10)
+    private fun nanosToSeconds(nanos: Long?): BigDecimal {
+        return BigDecimal(nanos?:0).setScale(10)
             .divide(BigDecimal(1000_000_000L), RoundingMode.HALF_UP)
             .setScale(3, RoundingMode.HALF_UP)
     }
+
+    data class NodeInfo(
+        val level: Int,
+        val label: String,
+        val children:List<Pair<String,List<Any>>>
+    )
 }

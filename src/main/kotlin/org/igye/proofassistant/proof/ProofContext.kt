@@ -1,5 +1,6 @@
 package org.igye.proofassistant.proof
 
+import org.igye.common.DebugTimer
 import org.igye.proofassistant.proof.ProofNodeState.*
 import org.igye.proofassistant.proof.prooftree.*
 import java.lang.Integer.min
@@ -19,7 +20,7 @@ class ProofContext(val target: PendingProofNode) {
     fun hasNewStatements(): Boolean = newStatements.isNotEmpty()
 
     fun getNextStatementToProve(): PendingProofNode {
-        updateDist(target)
+        DebugTimer.run("updateDist") { updateDist(target) }
         val minByOrNull = newStatements.values.asSequence()
             .filter { it.dist >= 0 && it.dist < Int.MAX_VALUE }
             .minByOrNull { it.dist }
@@ -90,7 +91,7 @@ class ProofContext(val target: PendingProofNode) {
 
     fun proofFoundForNodeToBeProved(nodeToBeProved: PendingProofNode, foundProof: ProofNode) {
         replacePendingNodeWithItsProof(pendingNode = nodeToBeProved, proofArg = foundProof)
-        markDependantsAsProved(foundProof)
+        DebugTimer.run("markDependantsAsProved") { markDependantsAsProved(foundProof) }
     }
 
     private fun replacePendingNodeWithItsProof(pendingNode: PendingProofNode, proofArg: ProofNode? = null): ProofNode {

@@ -72,7 +72,18 @@ internal class ProofAssistantTest {
             )
         }
         println("------------------------------------------------------------------------------------------")
-        println(DebugTimer.getStatsStr("total"))
+        val labels: Pair<String,List<Any>> = "total" to listOf(
+            "loadMetamathFile" to emptyList<Any>(),
+            "prove" to listOf(
+                "updateDist" to emptyList<Any>(),
+                "findMatchingAssertions" to listOf(
+                    "iterateSubstitutions" to emptyList<Any>(),
+                ),
+                "markDependantsAsProved" to emptyList(),
+            ),
+            "createProvableAssertion" to emptyList(),
+        )
+        println(DebugTimer.getStatsStr(totalTimeLabel = "total", grouping = labels))
         println("------------------------------------------------------------------------------------------")
     }
 

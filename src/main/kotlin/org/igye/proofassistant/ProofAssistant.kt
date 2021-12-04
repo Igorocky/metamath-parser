@@ -2,6 +2,7 @@ package org.igye.proofassistant
 
 import org.igye.common.ContinueInstr.CONTINUE
 import org.igye.common.ContinueInstr.STOP
+import org.igye.common.DebugTimer
 import org.igye.common.MetamathUtils
 import org.igye.common.MetamathUtils.applySubstitution
 import org.igye.common.MetamathUtils.collectAllVariables
@@ -129,7 +130,7 @@ object ProofAssistant {
             if (constProof != null) {
                 proofContext.proofFoundForNodeToBeProved(nodeToBeProved = currStmtToProve, foundProof = constProof)
             } else {
-                val matchingAssertions = findMatchingAssertions(currStmtToProve.stmt, ctx)
+                val matchingAssertions = DebugTimer.run("findMatchingAssertions") { findMatchingAssertions(currStmtToProve.stmt, ctx) }
                 for (asrtNode: CalcProofNode in matchingAssertions) {
                     createArgsForCalcNode(asrtNode, proofContext, ctx)
                     if (asrtNode.args.all { it.state == PROVED }) {
@@ -210,26 +211,28 @@ object ProofAssistant {
     private fun findMatchingAssertions(stmt: Stmt, ctx: MetamathContext): List<CalcProofNode> {
         val result = ArrayList<CalcProofNode>()
         for (assertion in ctx.getAssertions().values) {
-            Substitutions.iterateSubstitutions(
-                stmt = stmt.value,
-                asrtStmt = assertion.statement.content,
-                parenCounterProducer = ctx.parentheses!!::createParenthesesCounter
-            ) { subs ->
-                if (subs.begins.size == assertion.numberOfVariables && subs.isDefined.all { it }) {
-                    val subsList = ArrayList<IntArray>(subs.begins.size)
-                    for (i in subs.begins.indices) {
-                        subsList.add(subs.stmt.copyOfRange(fromIndex = subs.begins[i], toIndex = subs.ends[i]+1))
-                    }
-                    result.add(
-                        CalcProofNode(
-                            stmt = stmt,
-                            substitution = subsList,
-                            assertion = assertion,
-                            args = ArrayList(assertion.hypotheses.size),
+            DebugTimer.run("iterateSubstitutions") {
+                Substitutions.iterateSubstitutions(
+                    stmt = stmt.value,
+                    asrtStmt = assertion.statement.content,
+                    parenCounterProducer = ctx.parentheses!!::createParenthesesCounter
+                ) { subs ->
+                    if (subs.begins.size == assertion.numberOfVariables && subs.isDefined.all { it }) {
+                        val subsList = ArrayList<IntArray>(subs.begins.size)
+                        for (i in subs.begins.indices) {
+                            subsList.add(subs.stmt.copyOfRange(fromIndex = subs.begins[i], toIndex = subs.ends[i] + 1))
+                        }
+                        result.add(
+                            CalcProofNode(
+                                stmt = stmt,
+                                substitution = subsList,
+                                assertion = assertion,
+                                args = ArrayList(assertion.hypotheses.size),
+                            )
                         )
-                    )
+                    }
+                    CONTINUE
                 }
-                CONTINUE
             }
         }
         return result
