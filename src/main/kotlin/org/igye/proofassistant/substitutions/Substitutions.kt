@@ -6,10 +6,33 @@ import java.util.*
 
 object Substitutions {
 
-    fun iterateSubstitutions(stmt:IntArray, asrtStmt:IntArray, parenCounterProducer: () -> ParenthesesCounter, consumer: ((Substitution) -> ContinueInstr)) {
+    fun iterateSubstitutions(
+        stmt:IntArray,
+        asrtStmt:IntArray,
+        parenCounterProducer: () -> ParenthesesCounter,
+        consumer: ((Substitution) -> ContinueInstr)
+    ) {
+        val numOfVars = asrtStmt.asSequence().filter { it >= 0 }.maxOrNull().let {
+            if (it == null) 0 else it+1
+        }
+        iterateSubstitutions(
+            stmt = stmt,
+            asrtStmt = asrtStmt,
+            numOfVars = numOfVars,
+            parenCounterProducer = parenCounterProducer,
+            consumer = consumer,
+        )
+    }
+
+    fun iterateSubstitutions(
+        stmt:IntArray,
+        asrtStmt:IntArray,
+        numOfVars: Int,
+        parenCounterProducer: () -> ParenthesesCounter,
+        consumer: ((Substitution) -> ContinueInstr),
+    ) {
         // TODO: 11/27/2021 check stmt length before proceeding
-        val maxVarNumberOrNull = asrtStmt.asSequence().filter { it >= 0 }.maxOrNull()
-        if (maxVarNumberOrNull == null) {
+        if (numOfVars == 0) {
             if (asrtStmt.contentEquals(stmt)) {
                 consumer(
                     Substitution(
@@ -22,19 +45,23 @@ object Substitutions {
                 )
             }
         } else {
-            val numOfVariables = maxVarNumberOrNull+1
+            // TODO: 10/23/2021 move constParts and matchingConstParts to Assertion
+            val constParts: ConstParts = createConstParts(asrtStmt)
+            val matchingConstParts = createMatchingConstParts(constParts, parenCounterProducer)
             iterateMatchingConstParts(
                 stmt = stmt,
                 asrtStmt = asrtStmt,
-                parenCounterProducer = parenCounterProducer,
+                constParts = constParts,
+                matchingConstParts = matchingConstParts,
+                idxToMatch = 0,
             ) { constParts: ConstParts, matchingConstParts: ConstParts ->
                 val varGroups = createVarGroups(stmt, asrtStmt, constParts, matchingConstParts)
                 val subs = Substitution(
                     stmt = stmt,
-                    begins = IntArray(numOfVariables),
-                    ends = IntArray(numOfVariables),
-                    isDefined = BooleanArray(numOfVariables){false},
-                    parenthesesCounter = Array(numOfVariables){parenCounterProducer()},
+                    begins = IntArray(numOfVars),
+                    ends = IntArray(numOfVars),
+                    isDefined = BooleanArray(numOfVars){false},
+                    parenthesesCounter = Array(numOfVars){parenCounterProducer()},
                 )
                 iterateSubstitutions(
                     currSubs = subs,
@@ -183,7 +210,16 @@ object Substitutions {
         return result
     }
 
-    private fun createConstParts(stmt: IntArray): ConstParts {
+    fun createMatchingConstParts(constParts: ConstParts, parenCounterProducer: () -> ParenthesesCounter): ConstParts {
+        return ConstParts(
+            begins = IntArray(constParts.begins.size),
+            ends = IntArray(constParts.begins.size),
+            parenCounters = Array(constParts.begins.size+1){parenCounterProducer()},
+            remainingMinLength = emptyArray()
+        )
+    }
+
+    fun createConstParts(stmt: IntArray): ConstParts {
         val constParts: MutableList<IntArray> = ArrayList()
         for (i in stmt.indices) {
             if (stmt[i] < 0) {
@@ -217,7 +253,7 @@ object Substitutions {
         return result
     }
 
-    private fun iterateMatchingConstParts(
+    fun iterateMatchingConstParts(
         stmt: IntArray,
         asrtStmt: IntArray,
         constParts: ConstParts,
@@ -311,30 +347,6 @@ object Substitutions {
                 return continueInstr
             }
         }
-    }
-
-    fun iterateMatchingConstParts(
-        stmt: IntArray,
-        asrtStmt: IntArray,
-        parenCounterProducer: () -> ParenthesesCounter,
-        consumer: (constParts: ConstParts, matchingConstParts: ConstParts) -> ContinueInstr
-    ) {
-        // TODO: 10/23/2021 move constParts and matchingConstParts to Assertion
-        val constParts = createConstParts(asrtStmt)
-        val matchingConstParts = ConstParts(
-            begins = IntArray(constParts.begins.size),
-            ends = IntArray(constParts.begins.size),
-            parenCounters = Array(constParts.begins.size+1){parenCounterProducer()},
-            remainingMinLength = emptyArray()
-        )
-        iterateMatchingConstParts(
-            stmt = stmt,
-            asrtStmt = asrtStmt,
-            constParts = constParts,
-            matchingConstParts = matchingConstParts,
-            idxToMatch = 0,
-            consumer = consumer
-        )
     }
 
     private fun lengthOfGap(leftConstPartIdx:Int, constParts: List<IntArray>, asrtStmtSize: Int): Int {

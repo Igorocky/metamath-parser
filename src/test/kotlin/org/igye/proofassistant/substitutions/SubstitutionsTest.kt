@@ -334,22 +334,28 @@ internal class SubstitutionsTest {
 
     fun testIterateMatchingConstParts(testData: IterateMatchingConstPartsTestData) {
         //given
+        val parenCounterProducer = {
+            ParenthesesCounter(
+                roundBracketOpen = Symbols.toInt("("),
+                roundBracketClose = Symbols.toInt(")"),
+                curlyBracketOpen = Symbols.toInt("{"),
+                curlyBracketClose = Symbols.toInt("}"),
+                squareBracketOpen = Symbols.toInt("["),
+                squareBracketClose = Symbols.toInt("]"),
+            )
+        }
+        val asrtStmt = Symbols.stmtToArr(testData.asrtStmt)
+        val constParts: ConstParts = Substitutions.createConstParts(asrtStmt)
+        val matchingConstParts = Substitutions.createMatchingConstParts(constParts, parenCounterProducer)
         var cnt = 0
 
         //when
         Substitutions.iterateMatchingConstParts(
-            Symbols.stmtToArr(testData.stmt),
-            Symbols.stmtToArr(testData.asrtStmt),
-            parenCounterProducer = {
-                ParenthesesCounter(
-                    roundBracketOpen = Symbols.toInt("("),
-                    roundBracketClose = Symbols.toInt(")"),
-                    curlyBracketOpen = Symbols.toInt("{"),
-                    curlyBracketClose = Symbols.toInt("}"),
-                    squareBracketOpen = Symbols.toInt("["),
-                    squareBracketClose = Symbols.toInt("]"),
-                )
-            }
+            stmt = Symbols.stmtToArr(testData.stmt),
+            asrtStmt = asrtStmt,
+            constParts = constParts,
+            matchingConstParts = matchingConstParts,
+            idxToMatch = 0,
         ) { constParts: ConstParts, matchingConstParts: ConstParts ->
             //then
             assertEquals(testData.expectedConstParts, constPartsToStr(constParts))

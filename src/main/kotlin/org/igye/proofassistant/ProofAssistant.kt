@@ -223,6 +223,7 @@ object ProofAssistant {
                 Substitutions.iterateSubstitutions(
                     stmt = stmt.value,
                     asrtStmt = assertion.statement.content,
+                    numOfVars = assertion.numberOfVariables,
                     parenCounterProducer = parenCounterProducer
                 ) { subs ->
                     if (subs.begins.size == assertion.numberOfVariables && subs.isDefined.all { it }) {
