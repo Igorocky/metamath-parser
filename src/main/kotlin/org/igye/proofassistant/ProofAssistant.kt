@@ -7,11 +7,8 @@ import org.igye.common.MetamathUtils
 import org.igye.common.MetamathUtils.applySubstitution
 import org.igye.common.MetamathUtils.collectAllVariables
 import org.igye.common.MetamathUtils.toJson
-import org.igye.metamathparser.MetamathContext
-import org.igye.metamathparser.MetamathParentheses
-import org.igye.metamathparser.MetamathParserException
+import org.igye.metamathparser.*
 import org.igye.metamathparser.Parsers.parseMetamathFile
-import org.igye.metamathparser.Statement
 import org.igye.proofassistant.proof.*
 import org.igye.proofassistant.proof.ProofNodeState.PROVED
 import org.igye.proofassistant.proof.ProofNodeState.WAITING
@@ -19,6 +16,7 @@ import org.igye.proofassistant.proof.prooftree.CalcProofNode
 import org.igye.proofassistant.proof.prooftree.ConstProofNode
 import org.igye.proofassistant.proof.prooftree.PendingProofNode
 import org.igye.proofassistant.proof.prooftree.ProofNode
+import org.igye.proofassistant.substitutions.ParenthesesCounter
 import org.igye.proofassistant.substitutions.Substitutions
 import java.io.File
 import java.util.*
@@ -122,15 +120,21 @@ object ProofAssistant {
         )
 
         val proofContext = ProofContext(PendingProofNode(stmt = stmtToProve))
+        val allAssertions: Collection<Assertion> = ctx.getAssertions().values
+        val parenCounterProducer = ctx.parentheses!!::createParenthesesCounter
 
         while (proofContext.getProved(stmtToProve) == null && proofContext.hasNewStatements()) {
             val currStmtToProve: PendingProofNode = proofContext.getNextStatementToProve()
 
-            val constProof = findConstant(currStmtToProve.stmt, ctx)
+            val constProof = DebugTimer.run("findConstant") { findConstant(currStmtToProve.stmt, ctx) }
             if (constProof != null) {
                 proofContext.proofFoundForNodeToBeProved(nodeToBeProved = currStmtToProve, foundProof = constProof)
             } else {
-                val matchingAssertions = DebugTimer.run("findMatchingAssertions") { findMatchingAssertions(currStmtToProve.stmt, ctx) }
+                val matchingAssertions = DebugTimer.run("findMatchingAssertions") { findMatchingAssertions(
+                    stmt = currStmtToProve.stmt,
+                    parenCounterProducer = parenCounterProducer,
+                    allAssertions = allAssertions
+                ) }
                 for (asrtNode: CalcProofNode in matchingAssertions) {
                     createArgsForCalcNode(asrtNode, proofContext, ctx)
                     if (asrtNode.args.all { it.state == PROVED }) {
@@ -162,7 +166,7 @@ object ProofAssistant {
                 existingProof.addDependant(asrtNode)
                 asrtNode.args.add(existingProof)
             } else {
-                val constProof = findConstant(argStmt, ctx)
+                val constProof = DebugTimer.run("findConstant") { findConstant(argStmt, ctx) }
                 if (constProof != null) {
                     proofContext.markProved(constProof)
                     constProof.addDependant(asrtNode)
@@ -208,14 +212,18 @@ object ProofAssistant {
         return result
     }
 
-    private fun findMatchingAssertions(stmt: Stmt, ctx: MetamathContext): List<CalcProofNode> {
+    private fun findMatchingAssertions(
+        stmt: Stmt,
+        parenCounterProducer: () -> ParenthesesCounter,
+        allAssertions: Collection<Assertion>
+    ): List<CalcProofNode> {
         val result = ArrayList<CalcProofNode>()
-        for (assertion in ctx.getAssertions().values) {
+        for (assertion in allAssertions) {
             DebugTimer.run("iterateSubstitutions") {
                 Substitutions.iterateSubstitutions(
                     stmt = stmt.value,
                     asrtStmt = assertion.statement.content,
-                    parenCounterProducer = ctx.parentheses!!::createParenthesesCounter
+                    parenCounterProducer = parenCounterProducer
                 ) { subs ->
                     if (subs.begins.size == assertion.numberOfVariables && subs.isDefined.all { it }) {
                         val subsList = ArrayList<IntArray>(subs.begins.size)

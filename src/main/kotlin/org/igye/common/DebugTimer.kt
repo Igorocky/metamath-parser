@@ -1,8 +1,10 @@
 package org.igye.common
 
+import org.igye.metamathparser.MetamathParserException
 import java.math.BigDecimal
 import java.math.RoundingMode
 import java.util.*
+import kotlin.collections.HashSet
 
 object DebugTimer {
     private val begins: MutableMap<String, MutableMap<String, Long>> = HashMap()
@@ -55,6 +57,7 @@ object DebugTimer {
             val sb = StringBuilder()
             val stack = Stack<NodeInfo>()
             stack.push(NodeInfo(level = 0, label = grouping.first,children = grouping.second as List<Pair<String, List<Any>>>))
+            val processedLabels = HashSet<String>()
             while (stack.isNotEmpty()) {
                 val curr = stack.pop()
                 sb.append("\n")
@@ -70,6 +73,7 @@ object DebugTimer {
                     sb.append("---")
                 }
                 sb.append("${getPct(stats[curr.label]?.first, totalNanos)}${nanosToSeconds(stats[curr.label]?.first)}s ${curr.label}")
+                processedLabels.add(curr.label)
                 curr.children.asSequence()
                     .sortedBy { stats[it.first]?.first?:0 }
                     .forEach {
@@ -79,6 +83,10 @@ object DebugTimer {
                             children = it.second as List<Pair<String, List<Any>>>
                         ))
                     }
+            }
+            val missingLabels = stats.keys.minus(processedLabels)
+            if (missingLabels.isNotEmpty()) {
+                throw MetamathParserException("Missing labels: " + missingLabels.joinToString(", ") + ".")
             }
             return sb.toString()
         } else {

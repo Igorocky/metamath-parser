@@ -76,6 +76,7 @@ internal class ProofAssistantTest {
             "loadMetamathFile" to emptyList<Any>(),
             "prove" to listOf(
                 "updateDist" to emptyList<Any>(),
+                "findConstant" to emptyList(),
                 "findMatchingAssertions" to listOf(
                     "iterateSubstitutions" to emptyList<Any>(),
                 ),
