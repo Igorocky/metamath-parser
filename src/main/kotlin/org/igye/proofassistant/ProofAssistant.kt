@@ -16,6 +16,7 @@ import org.igye.proofassistant.proof.prooftree.CalcProofNode
 import org.igye.proofassistant.proof.prooftree.ConstProofNode
 import org.igye.proofassistant.proof.prooftree.PendingProofNode
 import org.igye.proofassistant.proof.prooftree.ProofNode
+import org.igye.proofassistant.substitutions.ConstParts
 import org.igye.proofassistant.substitutions.ParenthesesCounter
 import org.igye.proofassistant.substitutions.Substitutions
 import java.io.File
@@ -110,18 +111,19 @@ object ProofAssistant {
             throw MetamathParserException("!allowedStatementsTypes.contains(result.value[0])")
         }
 
-        ctx.parentheses = MetamathParentheses(
-            roundBracketOpen = ctx.getNumberBySymbol("("),
-            roundBracketClose = ctx.getNumberBySymbol(")"),
-            curlyBracketOpen = ctx.getNumberBySymbol("{"),
-            curlyBracketClose = ctx.getNumberBySymbol("}"),
-            squareBracketOpen = ctx.getNumberBySymbol("["),
-            squareBracketClose = ctx.getNumberBySymbol("]"),
-        )
-
         val proofContext = ProofContext(PendingProofNode(stmt = stmtToProve))
         val allAssertions: Collection<Assertion> = ctx.getAssertions().values
-        val parenCounterProducer = ctx.parentheses!!::createParenthesesCounter
+        for (asrt in allAssertions) {
+            val constParts: ConstParts = Substitutions.createConstParts(asrt.statement.content)
+            asrt.proofAssistantData = ProofAssistantData(
+                constParts = constParts,
+                matchingConstParts = Substitutions.createMatchingConstParts(
+                    constParts,
+                    ctx.parentheses::createParenthesesCounter
+                ),
+            )
+        }
+        val parenCounterProducer = ctx.parentheses::createParenthesesCounter
 
         while (proofContext.getProved(stmtToProve) == null && proofContext.hasNewStatements()) {
             val currStmtToProve: PendingProofNode = proofContext.getNextStatementToProve()
@@ -220,11 +222,14 @@ object ProofAssistant {
         val result = ArrayList<CalcProofNode>()
         for (assertion in allAssertions) {
             DebugTimer.run("iterateSubstitutions") {
+                val proofAssistantData = assertion.proofAssistantData!!
                 Substitutions.iterateSubstitutions(
                     stmt = stmt.value,
                     asrtStmt = assertion.statement.content,
                     numOfVars = assertion.numberOfVariables,
-                    parenCounterProducer = parenCounterProducer
+                    parenCounterProducer = parenCounterProducer,
+                    constParts = proofAssistantData.constParts,
+                    matchingConstParts = proofAssistantData.matchingConstParts,
                 ) { subs ->
                     if (subs.begins.size == assertion.numberOfVariables && subs.isDefined.all { it }) {
                         val subsList = ArrayList<IntArray>(subs.begins.size)

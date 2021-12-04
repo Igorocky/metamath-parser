@@ -15,11 +15,15 @@ object Substitutions {
         val numOfVars = asrtStmt.asSequence().filter { it >= 0 }.maxOrNull().let {
             if (it == null) 0 else it+1
         }
+        val constParts: ConstParts = createConstParts(asrtStmt)
+        val matchingConstParts: ConstParts = createMatchingConstParts(constParts, parenCounterProducer)
         iterateSubstitutions(
             stmt = stmt,
             asrtStmt = asrtStmt,
             numOfVars = numOfVars,
             parenCounterProducer = parenCounterProducer,
+            constParts = constParts,
+            matchingConstParts = matchingConstParts,
             consumer = consumer,
         )
     }
@@ -29,6 +33,8 @@ object Substitutions {
         asrtStmt:IntArray,
         numOfVars: Int,
         parenCounterProducer: () -> ParenthesesCounter,
+        constParts: ConstParts,
+        matchingConstParts: ConstParts,
         consumer: ((Substitution) -> ContinueInstr),
     ) {
         // TODO: 11/27/2021 check stmt length before proceeding
@@ -45,9 +51,6 @@ object Substitutions {
                 )
             }
         } else {
-            // TODO: 10/23/2021 move constParts and matchingConstParts to Assertion
-            val constParts: ConstParts = createConstParts(asrtStmt)
-            val matchingConstParts = createMatchingConstParts(constParts, parenCounterProducer)
             iterateMatchingConstParts(
                 stmt = stmt,
                 asrtStmt = asrtStmt,

@@ -18,7 +18,16 @@ class MetamathContext(
 
     private var lastCommentP: String? = null
 
-    var parentheses: MetamathParentheses? = null
+    val parentheses: MetamathParentheses by lazy {
+        MetamathParentheses(
+            roundBracketOpen = getNumberBySymbol("("),
+            roundBracketClose = getNumberBySymbol(")"),
+            curlyBracketOpen = getNumberBySymbol("{"),
+            curlyBracketClose = getNumberBySymbol("}"),
+            squareBracketOpen = getNumberBySymbol("["),
+            squareBracketClose = getNumberBySymbol("]"),
+        )
+    }
 
     override fun createChildContext(): MetamathContext {
         return MetamathContext(parent = this)
