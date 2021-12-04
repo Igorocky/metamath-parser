@@ -139,6 +139,7 @@ object ProofAssistant {
         if (allAssertions.first().proofAssistantData == null) {
             initProofAssistantData(ctx)
         }
+        val assertionsByPrefix = allAssertions.groupBy { getStatementPrefix(it.statement.content) }
 
         while (proofContext.getProved(stmtToProve) == null && proofContext.hasNewStatements()) {
             val currStmtToProve: PendingProofNode = proofContext.getNextStatementToProve()
@@ -149,7 +150,7 @@ object ProofAssistant {
             } else {
                 val matchingAssertions = DebugTimer2.findMatchingAssertions.run { findMatchingAssertions(
                     stmt = currStmtToProve.stmt,
-                    allAssertions = allAssertions
+                    assertionsByPrefix = assertionsByPrefix
                 ) }
                 for (asrtNode: CalcProofNode in matchingAssertions) {
                     createArgsForCalcNode(asrtNode, proofContext, ctx)
@@ -170,6 +171,11 @@ object ProofAssistant {
         }
 
         return proofContext.getProved(stmtToProve)?:proofContext.getWaiting(stmtToProve)!!
+    }
+
+    private fun getStatementPrefix(stmt:IntArray): Int {
+        val f = stmt[0]
+        return if (f < 0) f else 0
     }
 
     private fun createArgsForCalcNode(asrtNode: CalcProofNode, proofContext: ProofContext, ctx: MetamathContext) {
@@ -228,9 +234,10 @@ object ProofAssistant {
         return result
     }
 
-    private fun findMatchingAssertions(stmt: Stmt, allAssertions: Collection<Assertion>): List<CalcProofNode> {
+    private fun findMatchingAssertions(stmt: Stmt, assertionsByPrefix: Map<Int,Collection<Assertion>>): List<CalcProofNode> {
         val result = ArrayList<CalcProofNode>()
-        for (assertion in allAssertions) {
+        val assertionsToSearchIn = assertionsByPrefix[getStatementPrefix(stmt.value)]?: emptyList()
+        for (assertion in assertionsToSearchIn) {
             DebugTimer2.iterateSubstitutions.run {
                 val proofAssistantData = assertion.proofAssistantData!!
                 if (proofAssistantData.constParts.size > 0
