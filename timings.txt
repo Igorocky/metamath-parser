@@ -1,4 +1,14 @@
 ------------------------------------------------------------------------------------------
+100% 10.957s total
+|---80% 8.805s prove
+|   |---79% 8.700s findMatchingAssertions
+|   |   \---40% 4.416s iterateSubstitutions
+|   |---0% 0.035s updateDist
+|   |---0% 0.013s findConstant
+|   \---0% 0.004s markDependantsAsProved
+|---20% 2.144s loadMetamathFile
+\---0% 0.005s createProvableAssertion
+------------------------------------------------------------------------------------------
 100% 12.188s total
 |---82% 10.040s prove
 |   |---76% 9.315s findMatchingAssertions

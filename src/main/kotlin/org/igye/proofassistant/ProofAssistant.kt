@@ -7,8 +7,11 @@ import org.igye.common.MetamathUtils
 import org.igye.common.MetamathUtils.applySubstitution
 import org.igye.common.MetamathUtils.collectAllVariables
 import org.igye.common.MetamathUtils.toJson
-import org.igye.metamathparser.*
+import org.igye.metamathparser.Assertion
+import org.igye.metamathparser.MetamathContext
+import org.igye.metamathparser.MetamathParserException
 import org.igye.metamathparser.Parsers.parseMetamathFile
+import org.igye.metamathparser.Statement
 import org.igye.proofassistant.proof.*
 import org.igye.proofassistant.proof.ProofNodeState.PROVED
 import org.igye.proofassistant.proof.ProofNodeState.WAITING
@@ -17,12 +20,10 @@ import org.igye.proofassistant.proof.prooftree.ConstProofNode
 import org.igye.proofassistant.proof.prooftree.PendingProofNode
 import org.igye.proofassistant.proof.prooftree.ProofNode
 import org.igye.proofassistant.substitutions.ConstParts
-import org.igye.proofassistant.substitutions.ParenthesesCounter
+import org.igye.proofassistant.substitutions.Substitution
 import org.igye.proofassistant.substitutions.Substitutions
 import java.io.File
 import java.util.*
-import kotlin.collections.ArrayList
-import kotlin.collections.HashMap
 import kotlin.math.absoluteValue
 
 fun main() {
@@ -115,7 +116,13 @@ object ProofAssistant {
             asrt.proofAssistantData = ProofAssistantData(
                 constParts = constParts,
                 matchingConstParts = matchingConstParts,
-                varGroups = Substitutions.createVarGroups(asrtStmt = asrtStmt, constParts = constParts)
+                varGroups = Substitutions.createVarGroups(asrtStmt = asrtStmt, constParts = constParts),
+                substitution = Substitution(
+                    begins = IntArray(asrt.numberOfVariables),
+                    ends = IntArray(asrt.numberOfVariables),
+                    isDefined = BooleanArray(asrt.numberOfVariables),
+                    parenthesesCounter = Array(asrt.numberOfVariables){ctx.parentheses.createParenthesesCounter()},
+                ),
             )
         }
     }
@@ -143,7 +150,6 @@ object ProofAssistant {
             } else {
                 val matchingAssertions = DebugTimer.run("findMatchingAssertions") { findMatchingAssertions(
                     stmt = currStmtToProve.stmt,
-                    parenCounterProducer = parenCounterProducer,
                     allAssertions = allAssertions
                 ) }
                 for (asrtNode: CalcProofNode in matchingAssertions) {
@@ -223,11 +229,7 @@ object ProofAssistant {
         return result
     }
 
-    private fun findMatchingAssertions(
-        stmt: Stmt,
-        parenCounterProducer: () -> ParenthesesCounter,
-        allAssertions: Collection<Assertion>
-    ): List<CalcProofNode> {
+    private fun findMatchingAssertions(stmt: Stmt, allAssertions: Collection<Assertion>): List<CalcProofNode> {
         val result = ArrayList<CalcProofNode>()
         for (assertion in allAssertions) {
             DebugTimer.run("iterateSubstitutions") {
@@ -236,15 +238,15 @@ object ProofAssistant {
                     stmt = stmt.value,
                     asrtStmt = assertion.statement.content,
                     numOfVars = assertion.numberOfVariables,
-                    parenCounterProducer = parenCounterProducer,
                     constParts = proofAssistantData.constParts,
                     matchingConstParts = proofAssistantData.matchingConstParts,
                     varGroups = proofAssistantData.varGroups,
+                    subs = proofAssistantData.substitution,
                 ) { subs ->
                     if (subs.begins.size == assertion.numberOfVariables && subs.isDefined.all { it }) {
                         val subsList = ArrayList<IntArray>(subs.begins.size)
                         for (i in subs.begins.indices) {
-                            subsList.add(subs.stmt.copyOfRange(fromIndex = subs.begins[i], toIndex = subs.ends[i] + 1))
+                            subsList.add(stmt.value.copyOfRange(fromIndex = subs.begins[i], toIndex = subs.ends[i] + 1))
                         }
                         result.add(
                             CalcProofNode(

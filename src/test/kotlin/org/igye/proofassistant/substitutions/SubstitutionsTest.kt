@@ -380,7 +380,7 @@ internal class SubstitutionsTest {
             //then
             val asrtStmtStr = testData.asrtStmt
             val stmtStr = testData.stmt
-            val actualSubsStr = actualSubstToStr(subs)
+            val actualSubsStr = actualSubstToStr(stmt, subs)
             assertTrue(expectedSubsStr.contains(actualSubsStr))
             cnt++
             ContinueInstr.CONTINUE
@@ -388,9 +388,9 @@ internal class SubstitutionsTest {
         assertEquals(testData.expectedSubstitutions.size,cnt)
     }
 
-    private fun actualSubstToStr(subs:Substitution): String {
+    private fun actualSubstToStr(stmt: IntArray, subs:Substitution): String {
         return (0 until subs.begins.size).asSequence().filter { subs.isDefined[it] }.map { varNum ->
-            substToStr(varNum, subs.begins[varNum], subs.ends[varNum], subs.stmt)
+            substToStr(varNum, subs.begins[varNum], subs.ends[varNum], stmt)
         }.joinToString(separator = ", ")
     }
 

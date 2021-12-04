@@ -44,7 +44,11 @@ internal class ProofAssistantTest {
     @Test
     fun createProvableAssertion_creates_provable_assertion_verifiable_by_metamathExe() {
         DebugTimer.run("total") {
-            val ctx = DebugTimer.run("loadMetamathFile") { Parsers.parseMetamathFile(File("C:\\igye\\books\\metamath/set.mm")) }
+            val ctx = DebugTimer.run("loadMetamathFile") {
+                val ctx = Parsers.parseMetamathFile(File("C:\\igye\\books\\metamath/set.mm"))
+                ProofAssistant.initProofAssistantData(ctx)
+                ctx
+            }
             testCompressedProof(
                 expr = "wff ( y e. NN -> y e. CC )",
                 expectedProof = "\$p wff ( y e. NN -> y e. CC ) \$= ( cv cn wcel cc wi ) ABZCDGEDF \$.",
