@@ -1,6 +1,5 @@
 package org.igye.proofassistant.substitutions
 
-// TODO: 11/5/2021 move VarGroup to Assertion.proofAssistantData
 class VarGroup(
     val asrtStmt:IntArray,
     var numOfVars:Int = 0,

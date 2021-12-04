@@ -139,7 +139,6 @@ object ProofAssistant {
         if (allAssertions.first().proofAssistantData == null) {
             initProofAssistantData(ctx)
         }
-        val parenCounterProducer = ctx.parentheses::createParenthesesCounter
 
         while (proofContext.getProved(stmtToProve) == null && proofContext.hasNewStatements()) {
             val currStmtToProve: PendingProofNode = proofContext.getNextStatementToProve()
@@ -234,30 +233,35 @@ object ProofAssistant {
         for (assertion in allAssertions) {
             DebugTimer.run("iterateSubstitutions") {
                 val proofAssistantData = assertion.proofAssistantData!!
-                Substitutions.iterateSubstitutions(
-                    stmt = stmt.value,
-                    asrtStmt = assertion.statement.content,
-                    numOfVars = assertion.numberOfVariables,
-                    constParts = proofAssistantData.constParts,
-                    matchingConstParts = proofAssistantData.matchingConstParts,
-                    varGroups = proofAssistantData.varGroups,
-                    subs = proofAssistantData.substitution,
-                ) { subs ->
-                    if (subs.begins.size == assertion.numberOfVariables && subs.isDefined.all { it }) {
-                        val subsList = ArrayList<IntArray>(subs.begins.size)
-                        for (i in subs.begins.indices) {
-                            subsList.add(stmt.value.copyOfRange(fromIndex = subs.begins[i], toIndex = subs.ends[i] + 1))
-                        }
-                        result.add(
-                            CalcProofNode(
-                                stmt = stmt,
-                                substitution = subsList,
-                                assertion = assertion,
-                                args = ArrayList(assertion.hypotheses.size),
-                            )
-                        )
-                    }
+                if (proofAssistantData.constParts.size > 0
+                    && stmt.value.size < proofAssistantData.constParts.remainingMinLength[0] + proofAssistantData.constParts.begins[0]) {
                     CONTINUE
+                } else {
+                    Substitutions.iterateSubstitutions(
+                        stmt = stmt.value,
+                        asrtStmt = assertion.statement.content,
+                        numOfVars = assertion.numberOfVariables,
+                        constParts = proofAssistantData.constParts,
+                        matchingConstParts = proofAssistantData.matchingConstParts,
+                        varGroups = proofAssistantData.varGroups,
+                        subs = proofAssistantData.substitution,
+                    ) { subs ->
+                        if (subs.begins.size == assertion.numberOfVariables && subs.isDefined.all { it }) {
+                            val subsList = ArrayList<IntArray>(subs.begins.size)
+                            for (i in subs.begins.indices) {
+                                subsList.add(stmt.value.copyOfRange(fromIndex = subs.begins[i], toIndex = subs.ends[i] + 1))
+                            }
+                            result.add(
+                                CalcProofNode(
+                                    stmt = stmt,
+                                    substitution = subsList,
+                                    assertion = assertion,
+                                    args = ArrayList(assertion.hypotheses.size),
+                                )
+                            )
+                        }
+                        CONTINUE
+                    }
                 }
             }
         }

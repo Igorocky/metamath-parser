@@ -46,7 +46,6 @@ object Substitutions {
         subs: Substitution,
         consumer: ((Substitution) -> ContinueInstr),
     ) {
-        // TODO: 11/27/2021 check stmt length before proceeding
         if (numOfVars == 0) {
             if (asrtStmt.contentEquals(stmt)) {
                 consumer(subs)
