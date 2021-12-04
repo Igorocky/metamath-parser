@@ -41,7 +41,7 @@ fun main() {
 //        pathToDirToSaveTo = "C:\\igye\\temp\\metamath-reduced\\new"
         )
     }
-    println(DebugTimer.getStats())
+    println(DebugTimer.getStatsStr())
 }
 
 object MetamathVisualizer {
