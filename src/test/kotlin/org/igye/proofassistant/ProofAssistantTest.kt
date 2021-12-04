@@ -1,11 +1,11 @@
 package org.igye.proofassistant
 
-import org.igye.common.DebugTimer
+import org.igye.common.DebugTimer2
 import org.igye.common.MetamathUtils
 import org.igye.metamathparser.MetamathContext
 import org.igye.metamathparser.Parsers
 import org.igye.proofassistant.proof.ProofNodeState.PROVED
-import org.junit.Assert.*
+import org.junit.Assert.assertEquals
 import org.junit.Test
 import java.io.File
 
@@ -43,8 +43,8 @@ internal class ProofAssistantTest {
 
     @Test
     fun createProvableAssertion_creates_provable_assertion_verifiable_by_metamathExe() {
-        DebugTimer.run("total") {
-            val ctx = DebugTimer.run("loadMetamathFile") {
+        DebugTimer2.total.run {
+            val ctx = DebugTimer2.loadMetamathFile.run {
                 val ctx = Parsers.parseMetamathFile(File("C:\\igye\\books\\metamath/set.mm"))
                 ProofAssistant.initProofAssistantData(ctx)
                 ctx
@@ -76,28 +76,16 @@ internal class ProofAssistantTest {
             )
         }
         println("------------------------------------------------------------------------------------------")
-        val labels: Pair<String,List<Any>> = "total" to listOf(
-            "loadMetamathFile" to emptyList<Any>(),
-            "prove" to listOf(
-                "updateDist" to emptyList<Any>(),
-                "findConstant" to emptyList(),
-                "findMatchingAssertions" to listOf(
-                    "iterateSubstitutions" to emptyList<Any>(),
-                ),
-                "markDependantsAsProved" to emptyList(),
-            ),
-            "createProvableAssertion" to emptyList(),
-        )
-        println(DebugTimer.getStatsStr(totalTimeLabel = "total", grouping = labels))
+        println(DebugTimer2.getStatsStr(DebugTimer2.timers))
         println("------------------------------------------------------------------------------------------")
     }
 
     private fun testCompressedProof(expr: String, expectedProof: String, ctx: MetamathContext) {
         //given
-        val proof = DebugTimer.run("prove") { ProofAssistant.prove(expr, ctx) }
+        val proof = DebugTimer2.prove.run { ProofAssistant.prove(expr, ctx) }
 
         //when
-        val actualProof = DebugTimer.run("createProvableAssertion") { ProofAssistant.createProvableAssertion(proof, ctx) }
+        val actualProof = DebugTimer2.createProvableAssertion.run { ProofAssistant.createProvableAssertion(proof, ctx) }
 
         //then
         assertEquals(expectedProof, actualProof)

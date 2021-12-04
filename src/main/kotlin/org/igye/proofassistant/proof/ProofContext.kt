@@ -1,12 +1,13 @@
 package org.igye.proofassistant.proof
 
-import org.igye.common.DebugTimer
+import org.igye.common.DebugTimer2
 import org.igye.proofassistant.proof.ProofNodeState.*
-import org.igye.proofassistant.proof.prooftree.*
+import org.igye.proofassistant.proof.prooftree.CalcProofNode
+import org.igye.proofassistant.proof.prooftree.ConstProofNode
+import org.igye.proofassistant.proof.prooftree.PendingProofNode
+import org.igye.proofassistant.proof.prooftree.ProofNode
 import java.lang.Integer.min
 import java.util.*
-import kotlin.collections.ArrayList
-import kotlin.collections.HashMap
 
 class ProofContext(val target: PendingProofNode) {
     private val newStatements: MutableMap<Stmt, PendingProofNode> = HashMap()
@@ -20,7 +21,7 @@ class ProofContext(val target: PendingProofNode) {
     fun hasNewStatements(): Boolean = newStatements.isNotEmpty()
 
     fun getNextStatementToProve(): PendingProofNode {
-        DebugTimer.run("updateDist") { updateDist(target) }
+        DebugTimer2.updateDist.run { updateDist(target) }
         val minByOrNull = newStatements.values.asSequence()
             .filter { it.dist >= 0 && it.dist < Int.MAX_VALUE }
             .minByOrNull { it.dist }
@@ -91,7 +92,7 @@ class ProofContext(val target: PendingProofNode) {
 
     fun proofFoundForNodeToBeProved(nodeToBeProved: PendingProofNode, foundProof: ProofNode) {
         replacePendingNodeWithItsProof(pendingNode = nodeToBeProved, proofArg = foundProof)
-        DebugTimer.run("markDependantsAsProved") { markDependantsAsProved(foundProof) }
+        DebugTimer2.markDependantsAsProved.run { markDependantsAsProved(foundProof) }
     }
 
     private fun replacePendingNodeWithItsProof(pendingNode: PendingProofNode, proofArg: ProofNode? = null): ProofNode {

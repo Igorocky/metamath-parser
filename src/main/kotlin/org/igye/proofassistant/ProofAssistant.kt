@@ -2,7 +2,7 @@ package org.igye.proofassistant
 
 import org.igye.common.ContinueInstr.CONTINUE
 import org.igye.common.ContinueInstr.STOP
-import org.igye.common.DebugTimer
+import org.igye.common.DebugTimer2
 import org.igye.common.MetamathUtils
 import org.igye.common.MetamathUtils.applySubstitution
 import org.igye.common.MetamathUtils.collectAllVariables
@@ -143,11 +143,11 @@ object ProofAssistant {
         while (proofContext.getProved(stmtToProve) == null && proofContext.hasNewStatements()) {
             val currStmtToProve: PendingProofNode = proofContext.getNextStatementToProve()
 
-            val constProof = DebugTimer.run("findConstant") { findConstant(currStmtToProve.stmt, ctx) }
+            val constProof = DebugTimer2.findConstant.run { findConstant(currStmtToProve.stmt, ctx) }
             if (constProof != null) {
                 proofContext.proofFoundForNodeToBeProved(nodeToBeProved = currStmtToProve, foundProof = constProof)
             } else {
-                val matchingAssertions = DebugTimer.run("findMatchingAssertions") { findMatchingAssertions(
+                val matchingAssertions = DebugTimer2.findMatchingAssertions.run { findMatchingAssertions(
                     stmt = currStmtToProve.stmt,
                     allAssertions = allAssertions
                 ) }
@@ -182,7 +182,7 @@ object ProofAssistant {
                 existingProof.addDependant(asrtNode)
                 asrtNode.args.add(existingProof)
             } else {
-                val constProof = DebugTimer.run("findConstant") { findConstant(argStmt, ctx) }
+                val constProof = DebugTimer2.findConstant.run { findConstant(argStmt, ctx) }
                 if (constProof != null) {
                     proofContext.markProved(constProof)
                     constProof.addDependant(asrtNode)
@@ -231,7 +231,7 @@ object ProofAssistant {
     private fun findMatchingAssertions(stmt: Stmt, allAssertions: Collection<Assertion>): List<CalcProofNode> {
         val result = ArrayList<CalcProofNode>()
         for (assertion in allAssertions) {
-            DebugTimer.run("iterateSubstitutions") {
+            DebugTimer2.iterateSubstitutions.run {
                 val proofAssistantData = assertion.proofAssistantData!!
                 if (proofAssistantData.constParts.size > 0
                     && stmt.value.size < proofAssistantData.constParts.remainingMinLength[0] + proofAssistantData.constParts.begins[0]) {

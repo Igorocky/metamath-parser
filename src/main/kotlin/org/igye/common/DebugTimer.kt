@@ -9,11 +9,12 @@ import kotlin.collections.HashSet
 object DebugTimer {
     private val begins: MutableMap<String, MutableMap<String, Long>> = HashMap()
     private val accumulatedDurations: MutableMap<String, MutableMap<String, Long>> = HashMap()
+    private val createNewHashMap: (String) -> MutableMap<String, Long> = { HashMap() }
 
     fun <T> run(label: String, callable: () -> T): T {
-        return try {
+        try {
             begin(label)
-            callable.invoke()
+            return callable.invoke()
         } finally {
             end(label)
         }
@@ -21,7 +22,7 @@ object DebugTimer {
 
     @Synchronized
     private fun begin(label: String) {
-        val beginsForThisThread = begins.computeIfAbsent(Thread.currentThread().name) { HashMap() }
+        val beginsForThisThread = begins.computeIfAbsent(Thread.currentThread().name, createNewHashMap)
         beginsForThisThread[label] = System.nanoTime()
     }
 
@@ -29,7 +30,7 @@ object DebugTimer {
     private fun end(label: String) {
         val now = System.nanoTime()
         val threadName = Thread.currentThread().name
-        val durationMap = accumulatedDurations.computeIfAbsent(threadName) { HashMap() }
+        val durationMap = accumulatedDurations.computeIfAbsent(threadName, createNewHashMap)
         durationMap[label] = durationMap.getOrDefault(label, 0) + (
             now - begins[threadName]!![label]!!
         )
