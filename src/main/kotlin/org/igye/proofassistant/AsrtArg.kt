@@ -1,14 +1,13 @@
 package org.igye.proofassistant
 
+import org.igye.metamathparser.Statement
 import org.igye.proofassistant.substitutions.ConstParts
-import org.igye.proofassistant.substitutions.Substitution
 import org.igye.proofassistant.substitutions.VarGroup
 
-data class ProofAssistantData(
+data class AsrtArg(
+    val stmt: Statement,
+    val numberOfUniqueVars: Int,
     val constParts: ConstParts,
     val matchingConstParts: ConstParts,
     val varGroups: MutableList<VarGroup>,
-    val substitution: Substitution,
-    val isDirect: Boolean,
-    val nonTypeArgs: MutableList<AsrtArg>,
 )

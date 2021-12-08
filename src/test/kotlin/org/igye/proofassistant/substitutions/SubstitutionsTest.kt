@@ -389,7 +389,7 @@ internal class SubstitutionsTest {
     }
 
     private fun actualSubstToStr(stmt: IntArray, subs:Substitution): String {
-        return (0 until subs.begins.size).asSequence().filter { subs.isDefined[it] }.map { varNum ->
+        return (0 until subs.size).asSequence().filter { subs.isDefined[it] }.map { varNum ->
             substToStr(varNum, subs.begins[varNum], subs.ends[varNum], stmt)
         }.joinToString(separator = ", ")
     }

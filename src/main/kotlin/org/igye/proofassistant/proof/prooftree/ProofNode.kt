@@ -7,7 +7,7 @@ import org.igye.proofassistant.proof.ProofNodeState
 import org.igye.proofassistant.proof.Stmt
 import java.util.*
 
-sealed class ProofNode(val stmt: Stmt) {
+sealed class ProofNode(val stmt: Stmt, val isTypeProof: Boolean) {
     var state: ProofNodeState = ProofNodeState.NEW
     var dist: Int = -1
     private val dependants: MutableList<ProofNode> = ArrayList()
@@ -33,19 +33,21 @@ sealed class ProofNode(val stmt: Stmt) {
     }
 }
 
-class ConstProofNode(stmt: Stmt, val src: Statement):ProofNode(stmt = stmt)
+class ConstProofNode(stmt: Stmt, isTypeProof: Boolean, val src: Statement):ProofNode(stmt = stmt, isTypeProof = isTypeProof)
 
 class CalcProofNode(
     stmt: Stmt,
+    isTypeProof: Boolean,
     val assertion: Assertion,
     val substitution: List<IntArray>,
     val args: MutableList<ProofNode>
 ):ProofNode(
     stmt = Stmt(value = stmt.value, valueStr = stmt.valueStr + " <<<<< " + MetamathUtils.toString(assertion)),
+    isTypeProof = isTypeProof,
 ) {
     var label: String? = null
 }
 
-class PendingProofNode(stmt: Stmt):ProofNode(stmt = stmt) {
+class PendingProofNode(stmt: Stmt, isTypeProof: Boolean):ProofNode(stmt = stmt, isTypeProof = isTypeProof) {
     val proofs: MutableList<CalcProofNode> = ArrayList()
 }

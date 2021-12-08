@@ -19,9 +19,7 @@ object Substitutions {
         val matchingConstParts: ConstParts = createMatchingConstParts(constParts, parenCounterProducer)
         val varGroups = createVarGroups(asrtStmt = asrtStmt, constParts = constParts)
         val subs = Substitution(
-            begins = IntArray(numOfVars),
-            ends = IntArray(numOfVars),
-            isDefined = BooleanArray(numOfVars){false},
+            size = numOfVars,
             parenthesesCounter = Array(numOfVars){parenCounterProducer()},
         )
         iterateSubstitutions(
@@ -65,9 +63,11 @@ object Substitutions {
                     matchingConstParts = matchingConstParts,
                     varGroups = varGroups,
                 )
-                for (i in 0 until subs.begins.size) {
-                    subs.isDefined[i] = false
-                    subs.parenthesesCounter[i].reset()
+                for (i in 0 until subs.size) {
+                    if (subs.isNotLocked(i)) {
+                        subs.isDefined[i] = false
+                        subs.parenthesesCounter[i].reset()
+                    }
                 }
                 iterateSubstitutions(
                     stmt = stmt,

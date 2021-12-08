@@ -1,6 +1,8 @@
 package org.igye.proofassistant.proof
 
 import org.igye.common.DebugTimer2
+import org.igye.metamathparser.Assertion
+import org.igye.metamathparser.MetamathContext
 import org.igye.proofassistant.proof.ProofNodeState.*
 import org.igye.proofassistant.proof.prooftree.CalcProofNode
 import org.igye.proofassistant.proof.prooftree.ConstProofNode
@@ -9,33 +11,31 @@ import org.igye.proofassistant.proof.prooftree.ProofNode
 import java.lang.Integer.min
 import java.util.*
 
-class ProofContext(val target: PendingProofNode) {
+class ProofContext(
+    val mmCtx: MetamathContext,
+    val allTypes: Set<Int>,
+    val directAssertionsByPrefix: Map<Int, List<Assertion>>,
+    val indirectAssertionsByPrefix: Map<Int, List<Assertion>>,
+) {
     private val newStatements: MutableMap<Stmt, PendingProofNode> = HashMap()
     private val waitingStatements: MutableMap<Stmt, PendingProofNode> = HashMap()
-    private val provedStatements: MutableMap<Stmt, ProofNode> = HashMap()
-
-    init {
-        addNewStatement(target)
-    }
+    val provedStatements: MutableMap<Stmt, ProofNode> = HashMap()
 
     fun hasNewStatements(): Boolean = newStatements.isNotEmpty()
 
-    fun getNextStatementToProve(): PendingProofNode {
+    fun getNextStatementToProve(target: PendingProofNode, typeProofsOnly: Boolean): PendingProofNode? {
         DebugTimer2.updateDist.run { updateDist(target) }
-        val minByOrNull = newStatements.values.asSequence()
+        return newStatements.values.asSequence()
             .filter { it.dist >= 0 && it.dist < Int.MAX_VALUE }
+            .filter { !typeProofsOnly || it.isTypeProof }
             .minByOrNull { it.dist }
-        if (minByOrNull == null) {
-            throw AssumptionDoesntHoldException()
-        }
-        return minByOrNull!!
     }
 
     fun getProved(stmt: Stmt): ProofNode? = provedStatements[stmt]
 
-    fun getWaiting(stmt: Stmt): ProofNode? = waitingStatements[stmt]
+    fun getWaiting(stmt: Stmt): PendingProofNode? = waitingStatements[stmt]
 
-    fun getNew(stmt: Stmt): ProofNode? = newStatements[stmt]
+    fun getNew(stmt: Stmt): PendingProofNode? = newStatements[stmt]
 
     fun addNewStatement(node: PendingProofNode) {
         if (newStatements.put(node.stmt, node) != null) {

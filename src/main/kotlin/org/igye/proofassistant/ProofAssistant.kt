@@ -1,5 +1,6 @@
 package org.igye.proofassistant
 
+import org.igye.common.ContinueInstr
 import org.igye.common.ContinueInstr.CONTINUE
 import org.igye.common.ContinueInstr.STOP
 import org.igye.common.DebugTimer2
@@ -22,8 +23,11 @@ import org.igye.proofassistant.proof.prooftree.ProofNode
 import org.igye.proofassistant.substitutions.ConstParts
 import org.igye.proofassistant.substitutions.Substitution
 import org.igye.proofassistant.substitutions.Substitutions
+import org.igye.proofassistant.substitutions.VarGroup
 import java.io.File
 import java.util.*
+import kotlin.collections.ArrayList
+import kotlin.collections.HashSet
 import kotlin.math.absoluteValue
 
 fun main() {
@@ -113,47 +117,97 @@ object ProofAssistant {
                 constParts,
                 ctx.parentheses::createParenthesesCounter
             )
+            val varGroups = Substitutions.createVarGroups(asrtStmt = asrtStmt, constParts = constParts)
+
+            val isDirect = isDirectAssertion(asrt)
+            val nonTypeArgs = ArrayList<AsrtArg>()
+            if (!isDirect) {
+                for (hyp in asrt.hypotheses) {
+                    if (hyp.type == 'e') {
+                        val constParts: ConstParts = Substitutions.createConstParts(hyp.content)
+                        val matchingConstParts = Substitutions.createMatchingConstParts(
+                            constParts,
+                            ctx.parentheses::createParenthesesCounter
+                        )
+                        val varGroups = Substitutions.createVarGroups(asrtStmt = hyp.content, constParts = constParts)
+                        nonTypeArgs.add(AsrtArg(
+                            stmt = hyp,
+                            numberOfUniqueVars = hyp.content.asSequence().filter { it >= 0 }.toSet().size,
+                            constParts = constParts,
+                            matchingConstParts = matchingConstParts,
+                            varGroups = varGroups,
+                        ))
+                    }
+                }
+            }
+            if (!isDirect && nonTypeArgs.isEmpty()) {
+                throw AssumptionDoesntHoldException()
+            }
+
             asrt.proofAssistantData = ProofAssistantData(
+                numberOfVariables = asrt.numberOfVariables,
                 constParts = constParts,
                 matchingConstParts = matchingConstParts,
-                varGroups = Substitutions.createVarGroups(asrtStmt = asrtStmt, constParts = constParts),
+                varGroups = varGroups,
                 substitution = Substitution(
-                    begins = IntArray(asrt.numberOfVariables),
-                    ends = IntArray(asrt.numberOfVariables),
-                    isDefined = BooleanArray(asrt.numberOfVariables),
+                    size = asrt.numberOfVariables,
                     parenthesesCounter = Array(asrt.numberOfVariables){ctx.parentheses.createParenthesesCounter()},
                 ),
+                isDirect = isDirect,
+                nonTypeArgs = nonTypeArgs
             )
         }
     }
 
     fun prove(expr: String, ctx: MetamathContext): ProofNode {
-        val allowedStatementsTypes: Set<Int> = setOf("wff", "setvar", "class").map { ctx.getNumberBySymbol(it) }.toSet()
-        val stmtToProve = mkStmt(expr, ctx)
-        if (!allowedStatementsTypes.contains(stmtToProve.value[0])) {
-            throw MetamathParserException("!allowedStatementsTypes.contains(result.value[0])")
-        }
-
-        val proofContext = ProofContext(PendingProofNode(stmt = stmtToProve))
         val allAssertions: Collection<Assertion> = ctx.getAssertions().values
         if (allAssertions.first().proofAssistantData == null) {
             initProofAssistantData(ctx)
         }
-        val assertionsByPrefix = allAssertions.groupBy { getStatementPrefix(it.statement.content) }
 
-        while (proofContext.getProved(stmtToProve) == null && proofContext.hasNewStatements()) {
-            val currStmtToProve: PendingProofNode = proofContext.getNextStatementToProve()
+        val classifiedAssertions: Map<Boolean, Map<Int, List<Assertion>>> = allAssertions.asSequence()
+            .groupBy { it.proofAssistantData!!.isDirect }
+            .mapValues { (_, assertions) -> assertions.groupBy { getStatementPrefix(it.statement.content) } }
+        val directAssertionsByPrefix: Map<Int, List<Assertion>> = classifiedAssertions[true]?:emptyMap()
+        val indirectAssertionsByPrefix: Map<Int, List<Assertion>> = classifiedAssertions[false]?:emptyMap()
 
-            val constProof = DebugTimer2.findConstant.run { findConstant(currStmtToProve.stmt, ctx) }
+        val proofContext = ProofContext(
+            mmCtx = ctx,
+            allTypes = ctx.getHypotheses { it.type == 'f' }.asSequence().map { it.content[0] }.toSet(),
+            directAssertionsByPrefix = directAssertionsByPrefix,
+            indirectAssertionsByPrefix = indirectAssertionsByPrefix,
+        )
+        return prove(stmtToProve = mkStmt(expr, ctx), proofContext = proofContext)
+    }
+
+    private fun prove(stmtToProve: Stmt, proofContext: ProofContext, useDirectAssertionsOnly: Boolean = false): ProofNode {
+        val foundProof = proofContext.getProved(stmtToProve)
+        if (foundProof != null) {
+            return foundProof
+        }
+        val existingNode = proofContext.getWaiting(stmtToProve) ?: proofContext.getNew(stmtToProve)
+        val target = existingNode?:PendingProofNode(
+            stmt = stmtToProve,
+            isTypeProof = proofContext.allTypes.contains(stmtToProve.value[0])
+        )
+        if (existingNode == null) {
+            proofContext.addNewStatement(target)
+        }
+        while (proofContext.getProved(stmtToProve) == null) {
+            val currStmtToProve: PendingProofNode = proofContext.getNextStatementToProve(target = target, typeProofsOnly = target.isTypeProof)
+                ?: return proofContext.getWaiting(stmtToProve)!!
+
+            val constProof = DebugTimer2.findConstant.run { findConstant(currStmtToProve.stmt, proofContext.mmCtx) }
             if (constProof != null) {
                 proofContext.proofFoundForNodeToBeProved(nodeToBeProved = currStmtToProve, foundProof = constProof)
             } else {
-                val matchingAssertions = DebugTimer2.findMatchingAssertions.run { findMatchingAssertions(
+                val matchingAssertions = DebugTimer2.findMatchingAssertions.run { findMatchingDirectAssertions(
                     stmt = currStmtToProve.stmt,
-                    assertionsByPrefix = assertionsByPrefix
+                    isTypeProof = currStmtToProve.isTypeProof,
+                    assertionsByPrefix = proofContext.directAssertionsByPrefix
                 ) }
                 for (asrtNode: CalcProofNode in matchingAssertions) {
-                    createArgsForCalcNode(asrtNode, proofContext, ctx)
+                    createArgsForCalcNode(asrtNode, proofContext, proofContext.mmCtx)
                     if (asrtNode.args.all { it.state == PROVED }) {
                         proofContext.proofFoundForNodeToBeProved(nodeToBeProved = currStmtToProve, foundProof = asrtNode)
                         break
@@ -178,6 +232,10 @@ object ProofAssistant {
         return if (f < 0) f else 0
     }
 
+    private fun isDirectAssertion(asrt:Assertion): Boolean {
+        return asrt.statement.content.asSequence().filter { it >= 0 }.toSet().size == asrt.numberOfVariables
+    }
+
     private fun createArgsForCalcNode(asrtNode: CalcProofNode, proofContext: ProofContext, ctx: MetamathContext) {
         for (arg in asrtNode.assertion.hypotheses) {
             val argStmt = mkStmt(applySubstitution(arg.content, asrtNode.substitution), ctx)
@@ -194,7 +252,7 @@ object ProofAssistant {
                     constProof.addDependant(asrtNode)
                     asrtNode.args.add(constProof)
                 } else {
-                    val pendingNode = PendingProofNode(stmt = argStmt)
+                    val pendingNode = PendingProofNode(stmt = argStmt, isTypeProof = asrtNode.isTypeProof || arg.type == 'f')
                     proofContext.addNewStatement(pendingNode)
                     pendingNode.addDependant(asrtNode)
                     asrtNode.args.add(pendingNode)
@@ -225,7 +283,7 @@ object ProofAssistant {
         var result: ConstProofNode? = null
         ctx.iterateHypotheses { hyp->
             if ((hyp.type == 'f' || hyp.type == 'e') && hyp.content.contentEquals(stmt.value)) {
-                result = ConstProofNode(src = hyp, stmt = stmt)
+                result = ConstProofNode(src = hyp, stmt = stmt, isTypeProof = false)
                 STOP
             } else {
                 CONTINUE
@@ -234,7 +292,8 @@ object ProofAssistant {
         return result
     }
 
-    private fun findMatchingAssertions(stmt: Stmt, assertionsByPrefix: Map<Int,Collection<Assertion>>): List<CalcProofNode> {
+    private fun findMatchingDirectAssertions(node: ProofNode, assertionsByPrefix: Map<Int,Collection<Assertion>>): List<CalcProofNode> {
+        val stmt: Stmt = node.stmt
         val result = ArrayList<CalcProofNode>()
         val assertionsToSearchIn = assertionsByPrefix[getStatementPrefix(stmt.value)]?: emptyList()
         for (assertion in assertionsToSearchIn) {
@@ -251,11 +310,11 @@ object ProofAssistant {
                         constParts = proofAssistantData.constParts,
                         matchingConstParts = proofAssistantData.matchingConstParts,
                         varGroups = proofAssistantData.varGroups,
-                        subs = proofAssistantData.substitution,
+                        subs = proofAssistantData.substitution.unlock(),
                     ) { subs ->
-                        if (subs.begins.size == assertion.numberOfVariables && subs.isDefined.all { it }) {
-                            val subsList = ArrayList<IntArray>(subs.begins.size)
-                            for (i in subs.begins.indices) {
+                        if (subs.isDefined.all { it }) {
+                            val subsList = ArrayList<IntArray>(subs.size)
+                            for (i in 0 until subs.size) {
                                 subsList.add(stmt.value.copyOfRange(fromIndex = subs.begins[i], toIndex = subs.ends[i] + 1))
                             }
                             result.add(
@@ -264,8 +323,11 @@ object ProofAssistant {
                                     substitution = subsList,
                                     assertion = assertion,
                                     args = ArrayList(assertion.hypotheses.size),
+                                    isTypeProof = node.isTypeProof,
                                 )
                             )
+                        } else {
+                            throw AssumptionDoesntHoldException()
                         }
                         CONTINUE
                     }
@@ -273,6 +335,97 @@ object ProofAssistant {
             }
         }
         return result
+    }
+
+    private fun findMatchingIndirectAssertions(
+        node: ProofNode,
+        assertionsByPrefix: Map<Int,Collection<Assertion>>,
+        proofContext: ProofContext
+    ): List<CalcProofNode> {
+        val stmt: Stmt = node.stmt
+        val result = ArrayList<CalcProofNode>()
+        val assertionsToSearchIn = assertionsByPrefix[getStatementPrefix(stmt.value)]?:emptyList()
+        for (assertion in assertionsToSearchIn) {
+            DebugTimer2.iterateSubstitutions.run {
+                val proofAssistantData = assertion.proofAssistantData!!
+                if (proofAssistantData.constParts.size > 0
+                    && stmt.value.size < proofAssistantData.constParts.remainingMinLength[0] + proofAssistantData.constParts.begins[0]) {
+                    CONTINUE
+                } else {
+                    Substitutions.iterateSubstitutions(
+                        stmt = stmt.value,
+                        asrtStmt = assertion.statement.content,
+                        numOfVars = assertion.numberOfVariables,
+                        constParts = proofAssistantData.constParts,
+                        matchingConstParts = proofAssistantData.matchingConstParts,
+                        varGroups = proofAssistantData.varGroups,
+                        subs = proofAssistantData.substitution.unlock(),
+                    ) { subs ->
+                        if (!subs.isDefined.all { it }) {
+                            iterateMatchingHypotheses(proofContext = proofContext, assertion = assertion) { subs2 ->
+                                val subsList = ArrayList<IntArray>(subs2.size)
+                                for (i in 0 until subs2.size) {
+                                    subsList.add(stmt.value.copyOfRange(fromIndex = subs2.begins[i], toIndex = subs2.ends[i] + 1))
+                                }
+                                result.add(
+                                    CalcProofNode(
+                                        stmt = stmt,
+                                        substitution = subsList,
+                                        assertion = assertion,
+                                        args = ArrayList(assertion.hypotheses.size),
+                                        isTypeProof = node.isTypeProof,
+                                    )
+                                )
+                            }
+                        } else {
+                            throw AssumptionDoesntHoldException()
+                        }
+                        CONTINUE
+                    }
+                }
+            }
+        }
+        return result
+    }
+
+    private fun iterateMatchingHypotheses(
+        proofContext: ProofContext,
+        assertion: Assertion,
+        hypIdxToMatch: Int = -1,
+        consumer: (Substitution) -> Unit
+    ) {
+        val proofAssistantData = assertion.proofAssistantData!!
+        if (hypIdxToMatch == -1) {
+            proofAssistantData.substitution.lock()
+            proofAssistantData.nonTypeArgs.sortBy { it.numberOfUniqueVars }
+            iterateMatchingHypotheses(proofContext = proofContext, assertion = assertion, hypIdxToMatch = 0, consumer = consumer)
+        } else if (hypIdxToMatch == proofAssistantData.nonTypeArgs.size) {
+            if (currSubs.isDefined.all { it }) {
+                consumer(currSubs)
+            } else {
+                throw AssumptionDoesntHoldException()
+            }
+        } else {
+            for (provedNode in proofContext.provedStatements.values) {
+                Substitutions.iterateSubstitutions(
+                    stmt = provedNode.stmt.value,
+                    asrtStmt = proofAssistantData.nonTypeArgs[hypIdxToMatch].stmt.content,
+                    numOfVars = assertion.numberOfVariables,
+                    constParts = proofAssistantData.constParts,
+                    matchingConstParts = proofAssistantData.matchingConstParts,
+                    varGroups = proofAssistantData.varGroups,
+                    subs = proofAssistantData.substitution.unlock(),
+                ) { subs ->
+                    if (!subs.isDefined.all { it }) {
+                        subs.lock()
+                        iterateMatchingHypotheses()
+                    } else {
+                        throw AssumptionDoesntHoldException()
+                    }
+                    CONTINUE
+                }
+            }
+        }
     }
 
     private fun mkStmt(stmt: IntArray, ctx: MetamathContext): Stmt = Stmt(
