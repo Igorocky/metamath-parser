@@ -6,6 +6,7 @@ import org.igye.common.DebugTimer2
 import org.igye.common.MetamathUtils
 import org.igye.common.MetamathUtils.applySubstitution
 import org.igye.common.MetamathUtils.collectAllVariables
+import org.igye.common.MetamathUtils.mkStmt
 import org.igye.common.MetamathUtils.toJson
 import org.igye.metamathparser.Assertion
 import org.igye.metamathparser.MetamathContext
@@ -154,7 +155,7 @@ object ProofAssistant {
         }
     }
 
-    fun prove(expr: String, ctx: MetamathContext): ProofNode {
+    fun createProofContext(ctx: MetamathContext): ProofContext {
         val allAssertions: Collection<Assertion> = ctx.getAssertions().values
         if (allAssertions.first().proofAssistantData == null) {
             initProofAssistantData(ctx)
@@ -166,16 +167,20 @@ object ProofAssistant {
         val directAssertionsByPrefix: Map<Int, List<Assertion>> = classifiedAssertions[true]?:emptyMap()
         val indirectAssertionsByPrefix: Map<Int, List<Assertion>> = classifiedAssertions[false]?:emptyMap()
 
-        val proofContext = ProofContext(
+        return ProofContext(
             mmCtx = ctx,
             allTypes = ctx.getHypotheses { it.type == 'f' }.asSequence().map { it.content[0] }.toSet(),
             directAssertionsByPrefix = directAssertionsByPrefix,
             indirectAssertionsByPrefix = indirectAssertionsByPrefix,
         )
+    }
+
+    fun prove(expr: String, ctx: MetamathContext): ProofNode {
+        val proofContext = createProofContext(ctx)
         return prove(stmtToProve = mkStmt(expr, ctx), proofContext = proofContext)
     }
 
-    private fun prove(stmtToProve: Stmt, proofContext: ProofContext): ProofNode {
+    fun prove(stmtToProve: Stmt, proofContext: ProofContext): ProofNode {
         val foundProof = proofContext.getProved(stmtToProve)
         if (foundProof != null) {
             return foundProof
@@ -200,7 +205,7 @@ object ProofAssistant {
                     for (waitingStmt in waitingStatements) {
                         val matchingAssertions: List<CalcProofNode> = DebugTimer2.findMatchingAssertions.run { findMatchingIndirectAssertions(
                             node = waitingStmt,
-                            assertionsByPrefix = proofContext.directAssertionsByPrefix,
+                            assertionsByPrefix = proofContext.indirectAssertionsByPrefix,
                             proofContext = proofContext
                         ) }
                         for (asrtNode: CalcProofNode in matchingAssertions) {
@@ -436,7 +441,8 @@ object ProofAssistant {
             }
             consumer(proofAssistantData.substitution)
         } else {
-            for (provedNode in proofContext.provedStatements.values) {
+            // TODO: 12/9/2021 iterate over non-type statements only
+            for (provedNode in proofContext.provedStatements.values.filter { !proofContext.allTypes.contains(getStatementPrefix(it.stmt.value)) }) {
                 val constParts = proofAssistantData.nonTypeArgs[hypIdxToMatch].constParts
                 val stmt = provedNode.stmt
                 if (constParts.size == 0
@@ -448,7 +454,7 @@ object ProofAssistant {
                         constParts = constParts,
                         matchingConstParts = proofAssistantData.nonTypeArgs[hypIdxToMatch].matchingConstParts,
                         varGroups = proofAssistantData.nonTypeArgs[hypIdxToMatch].varGroups,
-                        subs = proofAssistantData.substitution.unlock(hypIdxToMatch),
+                        subs = proofAssistantData.substitution.unlock(hypIdxToMatch).lock(hypIdxToMatch),
                     ) { subs ->
                         iterateMatchingHypotheses(
                             proofContext = proofContext,
@@ -462,18 +468,4 @@ object ProofAssistant {
             }
         }
     }
-
-    private fun mkStmt(stmt: IntArray, ctx: MetamathContext): Stmt = Stmt(
-        value = stmt,
-        valueStr = stmt.asSequence().map { ctx.getSymbolByNumber(it) }.joinToString(" ")
-    )
-
-    private fun mkStmt(str:String, ctx: MetamathContext): Stmt = mkStmt(
-        stmt = str.trim().split(' ').asSequence()
-            .map { ctx.getNumberBySymbol(it) }
-            .toList()
-            .toIntArray(),
-        ctx = ctx
-    )
-
 }

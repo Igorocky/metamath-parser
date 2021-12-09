@@ -24,6 +24,7 @@ class Substitution(
 
     fun lock(hypIdx: Int = -1): Substitution {
         for (i in 0 until size) {
+            // TODO: 12/9/2021 don't overwrite other locks here
             locks[i] = if (isDefined[i]) hypIdx else -2
         }
         return this

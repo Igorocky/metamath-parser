@@ -144,4 +144,17 @@ object MetamathUtils {
         }
         return variables
     }
+
+    fun mkStmt(stmt: IntArray, ctx: MetamathContext): Stmt = Stmt(
+        value = stmt,
+        valueStr = stmt.asSequence().map { ctx.getSymbolByNumber(it) }.joinToString(" ")
+    )
+
+    fun mkStmt(str:String, ctx: MetamathContext): Stmt = mkStmt(
+        stmt = str.trim().split(' ').asSequence()
+            .map { ctx.getNumberBySymbol(it) }
+            .toList()
+            .toIntArray(),
+        ctx = ctx
+    )
 }

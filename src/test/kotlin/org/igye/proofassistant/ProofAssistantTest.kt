@@ -93,9 +93,13 @@ internal class ProofAssistantTest {
                 ctx
             }
             testCompressedProof(
-                expr = "|- t = t",
-                expectedProof = "",
-                ctx = ctx
+                ctx = ctx,
+                expectedProof = "\$p |- ( t + 0 ) = t \$= ( a2 ) AB \$.",
+                expressions = listOf(
+                    "|- ( t + 0 ) = t",
+                    "|- ( ( t + 0 ) = t -> ( ( t + 0 ) = t -> t = t ) )",
+                    "|- t = t"
+                )
             )
         }
         println("------------------------------------------------------------------------------------------")
@@ -110,6 +114,23 @@ internal class ProofAssistantTest {
 
         //when
         val actualProof = DebugTimer2.createProvableAssertion.run { ProofAssistant.createProvableAssertion(proof, ctx) }
+
+        //then
+        assertEquals(expectedProof, actualProof)
+    }
+
+    private fun testCompressedProof(ctx: MetamathContext, expectedProof: String, expressions: List<String>) {
+        //given
+        val proofContext = ProofAssistant.createProofContext(ctx)
+
+        //when
+        val proofs = expressions.map { ProofAssistant.prove(MetamathUtils.mkStmt(it, ctx), proofContext) }
+
+        //then
+        assertEquals(PROVED, proofs.last().state)
+
+        //when
+        val actualProof = ProofAssistant.createProvableAssertion(proofs.last(), ctx)
 
         //then
         assertEquals(expectedProof, actualProof)
