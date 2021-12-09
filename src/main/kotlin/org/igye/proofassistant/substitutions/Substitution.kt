@@ -10,7 +10,7 @@ class Substitution(
     val isDefined: BooleanArray = BooleanArray(size)
     val locks: IntArray = IntArray(size)
 
-    fun isNotLocked(i: Int) = locks[i] <= -2
+    fun isNotLocked(i: Int) = !isLocked(i)
     fun isLocked(i: Int) = locks[i] > -2
 
     fun unlock(hypIdx: Int = -1): Substitution {
@@ -24,8 +24,9 @@ class Substitution(
 
     fun lock(hypIdx: Int = -1): Substitution {
         for (i in 0 until size) {
-            // TODO: 12/9/2021 don't overwrite other locks here
-            locks[i] = if (isDefined[i]) hypIdx else -2
+            if (isDefined[i] && isNotLocked(i)) {
+                locks[i] = hypIdx
+            }
         }
         return this
     }

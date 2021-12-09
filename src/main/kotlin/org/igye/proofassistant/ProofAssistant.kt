@@ -454,8 +454,9 @@ object ProofAssistant {
                         constParts = constParts,
                         matchingConstParts = proofAssistantData.nonTypeArgs[hypIdxToMatch].matchingConstParts,
                         varGroups = proofAssistantData.nonTypeArgs[hypIdxToMatch].varGroups,
-                        subs = proofAssistantData.substitution.unlock(hypIdxToMatch).lock(hypIdxToMatch),
+                        subs = proofAssistantData.substitution.unlock(hypIdxToMatch),
                     ) { subs ->
+                        subs.lock(hypIdxToMatch)
                         iterateMatchingHypotheses(
                             proofContext = proofContext,
                             assertion = assertion,
