@@ -196,6 +196,7 @@ object ProofAssistant {
                     break
                 } else {
                     val waitingStatements = proofContext.waitingStatements.values.toList()
+                    var newProofWasFound = false
                     for (waitingStmt in waitingStatements) {
                         val matchingAssertions: List<CalcProofNode> = DebugTimer2.findMatchingAssertions.run { findMatchingIndirectAssertions(
                             node = waitingStmt,
@@ -206,9 +207,13 @@ object ProofAssistant {
                             createArgsForCalcNode(asrtNode, proofContext, proofContext.mmCtx)
                             if (asrtNode.args.all { it.state == PROVED }) {
                                 proofContext.proofFoundForNodeToBeProved(nodeToBeProved = waitingStmt, foundProof = asrtNode)
+                                newProofWasFound = true
                                 break
                             }
                         }
+                    }
+                    if (!newProofWasFound) {
+                        break
                     }
                 }
             } else {

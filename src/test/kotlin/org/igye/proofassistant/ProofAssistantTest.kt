@@ -106,6 +106,7 @@ internal class ProofAssistantTest {
     private fun testCompressedProof(expr: String, expectedProof: String, ctx: MetamathContext) {
         //given
         val proof = DebugTimer2.prove.run { ProofAssistant.prove(expr, ctx) }
+        assertEquals(PROVED, proof.state)
 
         //when
         val actualProof = DebugTimer2.createProvableAssertion.run { ProofAssistant.createProvableAssertion(proof, ctx) }
