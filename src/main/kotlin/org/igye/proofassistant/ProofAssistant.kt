@@ -1,6 +1,5 @@
 package org.igye.proofassistant
 
-import org.igye.common.ContinueInstr
 import org.igye.common.ContinueInstr.CONTINUE
 import org.igye.common.ContinueInstr.STOP
 import org.igye.common.DebugTimer2
@@ -10,7 +9,6 @@ import org.igye.common.MetamathUtils.collectAllVariables
 import org.igye.common.MetamathUtils.toJson
 import org.igye.metamathparser.Assertion
 import org.igye.metamathparser.MetamathContext
-import org.igye.metamathparser.MetamathParserException
 import org.igye.metamathparser.Parsers.parseMetamathFile
 import org.igye.metamathparser.Statement
 import org.igye.proofassistant.proof.*
@@ -23,11 +21,9 @@ import org.igye.proofassistant.proof.prooftree.ProofNode
 import org.igye.proofassistant.substitutions.ConstParts
 import org.igye.proofassistant.substitutions.Substitution
 import org.igye.proofassistant.substitutions.Substitutions
-import org.igye.proofassistant.substitutions.VarGroup
 import java.io.File
 import java.util.*
 import kotlin.collections.ArrayList
-import kotlin.collections.HashSet
 import kotlin.math.absoluteValue
 
 fun main() {
@@ -145,7 +141,6 @@ object ProofAssistant {
             }
 
             asrt.proofAssistantData = ProofAssistantData(
-                numberOfVariables = asrt.numberOfVariables,
                 constParts = constParts,
                 matchingConstParts = matchingConstParts,
                 varGroups = varGroups,
@@ -180,7 +175,7 @@ object ProofAssistant {
         return prove(stmtToProve = mkStmt(expr, ctx), proofContext = proofContext)
     }
 
-    private fun prove(stmtToProve: Stmt, proofContext: ProofContext, useDirectAssertionsOnly: Boolean = false): ProofNode {
+    private fun prove(stmtToProve: Stmt, proofContext: ProofContext): ProofNode {
         val foundProof = proofContext.getProved(stmtToProve)
         if (foundProof != null) {
             return foundProof
@@ -194,33 +189,53 @@ object ProofAssistant {
             proofContext.addNewStatement(target)
         }
         while (proofContext.getProved(stmtToProve) == null) {
-            val currStmtToProve: PendingProofNode = proofContext.getNextStatementToProve(target = target, typeProofsOnly = target.isTypeProof)
-                ?: return proofContext.getWaiting(stmtToProve)!!
+            val currStmtToProve = proofContext.getNextStatementToProve(target = target, typeProofsOnly = target.isTypeProof)
 
-            val constProof = DebugTimer2.findConstant.run { findConstant(currStmtToProve.stmt, proofContext.mmCtx) }
-            if (constProof != null) {
-                proofContext.proofFoundForNodeToBeProved(nodeToBeProved = currStmtToProve, foundProof = constProof)
-            } else {
-                val matchingAssertions = DebugTimer2.findMatchingAssertions.run { findMatchingDirectAssertions(
-                    stmt = currStmtToProve.stmt,
-                    isTypeProof = currStmtToProve.isTypeProof,
-                    assertionsByPrefix = proofContext.directAssertionsByPrefix
-                ) }
-                for (asrtNode: CalcProofNode in matchingAssertions) {
-                    createArgsForCalcNode(asrtNode, proofContext, proofContext.mmCtx)
-                    if (asrtNode.args.all { it.state == PROVED }) {
-                        proofContext.proofFoundForNodeToBeProved(nodeToBeProved = currStmtToProve, foundProof = asrtNode)
-                        break
-                    } else {
-                        currStmtToProve.proofs.add(asrtNode)
-                        asrtNode.addDependant(currStmtToProve)
-                        asrtNode.state = WAITING
+            if (currStmtToProve == null) {
+                if (target.isTypeProof) {
+                    break
+                } else {
+                    val waitingStatements = proofContext.waitingStatements.values.toList()
+                    for (waitingStmt in waitingStatements) {
+                        val matchingAssertions: List<CalcProofNode> = DebugTimer2.findMatchingAssertions.run { findMatchingIndirectAssertions(
+                            node = waitingStmt,
+                            assertionsByPrefix = proofContext.directAssertionsByPrefix,
+                            proofContext = proofContext
+                        ) }
+                        for (asrtNode: CalcProofNode in matchingAssertions) {
+                            createArgsForCalcNode(asrtNode, proofContext, proofContext.mmCtx)
+                            if (asrtNode.args.all { it.state == PROVED }) {
+                                proofContext.proofFoundForNodeToBeProved(nodeToBeProved = waitingStmt, foundProof = asrtNode)
+                                break
+                            }
+                        }
                     }
                 }
-            }
+            } else {
+                val constProof = DebugTimer2.findConstant.run { findConstant(currStmtToProve.stmt, proofContext.mmCtx) }
+                if (constProof != null) {
+                    proofContext.proofFoundForNodeToBeProved(nodeToBeProved = currStmtToProve, foundProof = constProof)
+                } else {
+                    val matchingAssertions: List<CalcProofNode> = DebugTimer2.findMatchingAssertions.run { findMatchingDirectAssertions(
+                        node = currStmtToProve,
+                        assertionsByPrefix = proofContext.directAssertionsByPrefix
+                    ) }
+                    for (asrtNode: CalcProofNode in matchingAssertions) {
+                        createArgsForCalcNode(asrtNode, proofContext, proofContext.mmCtx)
+                        if (asrtNode.args.all { it.state == PROVED }) {
+                            proofContext.proofFoundForNodeToBeProved(nodeToBeProved = currStmtToProve, foundProof = asrtNode)
+                            break
+                        } else {
+                            currStmtToProve.proofs.add(asrtNode)
+                            asrtNode.addDependant(currStmtToProve)
+                            asrtNode.state = WAITING
+                        }
+                    }
+                }
 
-            if (currStmtToProve.state == ProofNodeState.NEW) {
-                proofContext.markWaiting(currStmtToProve)
+                if (currStmtToProve.state == ProofNodeState.NEW) {
+                    proofContext.markWaiting(currStmtToProve)
+                }
             }
         }
 
@@ -367,6 +382,17 @@ object ProofAssistant {
                                 for (i in 0 until subs2.size) {
                                     subsList.add(stmt.value.copyOfRange(fromIndex = subs2.begins[i], toIndex = subs2.ends[i] + 1))
                                 }
+                                for (hyp in assertion.hypotheses) {
+                                    if (hyp.type == 'f') {
+                                        val typeMatches = prove(
+                                            stmtToProve = mkStmt(applySubstitution(hyp.content, subsList), proofContext.mmCtx),
+                                            proofContext = proofContext,
+                                        )
+                                        if (typeMatches.state != PROVED) {
+                                            return@iterateMatchingHypotheses
+                                        }
+                                    }
+                                }
                                 result.add(
                                     CalcProofNode(
                                         stmt = stmt,
@@ -400,29 +426,33 @@ object ProofAssistant {
             proofAssistantData.nonTypeArgs.sortBy { it.numberOfUniqueVars }
             iterateMatchingHypotheses(proofContext = proofContext, assertion = assertion, hypIdxToMatch = 0, consumer = consumer)
         } else if (hypIdxToMatch == proofAssistantData.nonTypeArgs.size) {
-            if (currSubs.isDefined.all { it }) {
-                consumer(currSubs)
-            } else {
+            if (!proofAssistantData.substitution.isDefined.all { it }) {
                 throw AssumptionDoesntHoldException()
             }
+            consumer(proofAssistantData.substitution)
         } else {
             for (provedNode in proofContext.provedStatements.values) {
-                Substitutions.iterateSubstitutions(
-                    stmt = provedNode.stmt.value,
-                    asrtStmt = proofAssistantData.nonTypeArgs[hypIdxToMatch].stmt.content,
-                    numOfVars = assertion.numberOfVariables,
-                    constParts = proofAssistantData.constParts,
-                    matchingConstParts = proofAssistantData.matchingConstParts,
-                    varGroups = proofAssistantData.varGroups,
-                    subs = proofAssistantData.substitution.unlock(),
-                ) { subs ->
-                    if (!subs.isDefined.all { it }) {
-                        subs.lock()
-                        iterateMatchingHypotheses()
-                    } else {
-                        throw AssumptionDoesntHoldException()
+                val constParts = proofAssistantData.nonTypeArgs[hypIdxToMatch].constParts
+                val stmt = provedNode.stmt
+                if (constParts.size == 0
+                    || stmt.value.size >= constParts.remainingMinLength[0] + constParts.begins[0]) {
+                    Substitutions.iterateSubstitutions(
+                        stmt = stmt.value,
+                        asrtStmt = proofAssistantData.nonTypeArgs[hypIdxToMatch].stmt.content,
+                        numOfVars = assertion.numberOfVariables,
+                        constParts = constParts,
+                        matchingConstParts = proofAssistantData.nonTypeArgs[hypIdxToMatch].matchingConstParts,
+                        varGroups = proofAssistantData.nonTypeArgs[hypIdxToMatch].varGroups,
+                        subs = proofAssistantData.substitution.unlock(hypIdxToMatch),
+                    ) { subs ->
+                        iterateMatchingHypotheses(
+                            proofContext = proofContext,
+                            assertion = assertion,
+                            hypIdxToMatch = hypIdxToMatch+1,
+                            consumer = consumer,
+                        )
+                        CONTINUE
                     }
-                    CONTINUE
                 }
             }
         }

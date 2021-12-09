@@ -34,7 +34,7 @@ object Parsers {
 
     fun parseMetamathFile(file: File):MetamathContext {
         return parseMetamathFile(
-            text = File("C:\\igye\\books\\metamath/set.mm").readText(),
+            text = file.readText(),
             rootContext = MetamathContext(),
             exprProc = ExpressionProcessor
         )

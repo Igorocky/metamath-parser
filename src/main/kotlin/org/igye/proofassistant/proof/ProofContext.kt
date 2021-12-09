@@ -18,7 +18,7 @@ class ProofContext(
     val indirectAssertionsByPrefix: Map<Int, List<Assertion>>,
 ) {
     private val newStatements: MutableMap<Stmt, PendingProofNode> = HashMap()
-    private val waitingStatements: MutableMap<Stmt, PendingProofNode> = HashMap()
+    val waitingStatements: MutableMap<Stmt, PendingProofNode> = HashMap()
     val provedStatements: MutableMap<Stmt, ProofNode> = HashMap()
 
     fun hasNewStatements(): Boolean = newStatements.isNotEmpty()

@@ -2,6 +2,8 @@ package org.igye.proofassistant
 
 import org.igye.common.DebugTimer2
 import org.igye.common.MetamathUtils
+import org.igye.common.Utils
+import org.igye.metamathparser.ExpressionProcessor
 import org.igye.metamathparser.MetamathContext
 import org.igye.metamathparser.Parsers
 import org.igye.proofassistant.proof.ProofNodeState.PROVED
@@ -42,7 +44,7 @@ internal class ProofAssistantTest {
     }
 
     @Test
-    fun createProvableAssertion_creates_provable_assertion_verifiable_by_metamathExe() {
+    fun createProvableAssertion_creates_provable_assertion_for_type_statements_verifiable_by_metamathExe() {
         DebugTimer2.total.run {
             val ctx = DebugTimer2.loadMetamathFile.run {
                 val ctx = Parsers.parseMetamathFile(File("C:\\igye\\books\\metamath/set.mm"))
@@ -72,6 +74,27 @@ internal class ProofAssistantTest {
             testCompressedProof(
                 expr = "wff ( A. z e. NN ( ( z < y -> A. x e. ZZ ( sqrt ` 2 ) =/= ( x / z ) ) /\\ ( z = y -> A. x e. ZZ ( sqrt ` 2 ) =/= ( x / z ) ) ) <-> ( A. z e. NN ( z < y -> A. x e. ZZ ( sqrt ` 2 ) =/= ( x / z ) ) /\\ A. z e. NN ( z = y -> A. x e. ZZ ( sqrt ` 2 ) =/= ( x / z ) ) ) )",
                 expectedProof = "\$p wff ( A. z e. NN ( ( z < y -> A. x e. ZZ ( sqrt ` 2 ) =/= ( x / z ) ) /\\ ( z = y -> A. x e. ZZ ( sqrt ` 2 ) =/= ( x / z ) ) ) <-> ( A. z e. NN ( z < y -> A. x e. ZZ ( sqrt ` 2 ) =/= ( x / z ) ) /\\ A. z e. NN ( z = y -> A. x e. ZZ ( sqrt ` 2 ) =/= ( x / z ) ) ) ) \$= ( cv clt wbr c2 csqrt cfv cdiv co wne cz wral wi wceq wa cn wb ) CDZBDZEFGHIADTJKLAMNZOZTUAPUBOZQCRZNUCCUENUDCUENQS \$.",
+                ctx = ctx
+            )
+        }
+        println("------------------------------------------------------------------------------------------")
+        println(DebugTimer2.getStatsStr(DebugTimer2.timers))
+        println("------------------------------------------------------------------------------------------")
+    }
+
+    @Test
+    fun createProvableAssertion_creates_provable_assertion_for_simple_provable_statements_verifiable_by_metamathExe() {
+        DebugTimer2.total.run {
+            val ctx = DebugTimer2.loadMetamathFile.run {
+                val ctx = Parsers.parseMetamathFile(
+                    text = Utils.readStringFromClassPath("/demo0-without-theorem.mm"), rootContext = MetamathContext(), exprProc = ExpressionProcessor
+                )
+                ProofAssistant.initProofAssistantData(ctx)
+                ctx
+            }
+            testCompressedProof(
+                expr = "|- t = t",
+                expectedProof = "",
                 ctx = ctx
             )
         }

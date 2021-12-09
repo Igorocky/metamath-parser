@@ -6,22 +6,25 @@ class Substitution(
 ) {
     val begins: IntArray = IntArray(size)
     val ends: IntArray = IntArray(size)
+    val stmt: Array<IntArray> = Array(size){begins}
     val isDefined: BooleanArray = BooleanArray(size)
     val locks: IntArray = IntArray(size)
 
     fun isNotLocked(i: Int) = locks[i] <= -2
     fun isLocked(i: Int) = locks[i] > -2
 
-    fun unlock(): Substitution {
+    fun unlock(hypIdx: Int = -1): Substitution {
         for (i in 0 until size) {
-            locks[i] = -2
+            if (locks[i] >= hypIdx) {
+                locks[i] = -2
+            }
         }
         return this
     }
 
-    fun lock(): Substitution {
+    fun lock(hypIdx: Int = -1): Substitution {
         for (i in 0 until size) {
-            locks[i] = if (isDefined[i]) -1 else -2
+            locks[i] = if (isDefined[i]) hypIdx else -2
         }
         return this
     }

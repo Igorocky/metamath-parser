@@ -122,6 +122,7 @@ object Substitutions {
         if (!currSubs.isDefined[varNum]) {
             currSubs.isDefined[varNum] = true
             currSubs.begins[varNum] = subExprBeginIdx
+            currSubs.stmt[varNum] = stmt
             if (currVarIdx == grp.numOfVars-1) {
                 currSubs.ends[varNum] = grp.exprEndIdx
                 continueInstr = invokeNext(subExprLength = maxSubExprLength)
