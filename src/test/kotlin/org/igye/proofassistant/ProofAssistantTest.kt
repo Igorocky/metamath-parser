@@ -94,12 +94,12 @@ internal class ProofAssistantTest {
             }
             testCompressedProof(
                 ctx = ctx,
-                expectedProof = "\$p |- t = t \$= ( tze tpl weq a2 wim a1 mp ) ABCZADZAADZAEZJJKFLIAAGHH \$.",
+                expectedProof = "\$p |- s = s \$= ( tze tpl weq a2 wim a1 mp ) ABCZADZAADZAEZJJKFLIAAGHH \$.",
                 expressions = listOf(
-                    "|- ( t + 0 ) = t",
-                    "|- ( ( t + 0 ) = t -> ( ( t + 0 ) = t -> t = t ) )",
-                    "|- ( ( t + 0 ) = t -> t = t )",
-                    "|- t = t"
+                    "|- ( s + 0 ) = s",
+                    "|- ( ( s + 0 ) = s -> ( ( s + 0 ) = s -> s = s ) )",
+                    "|- ( ( s + 0 ) = s -> s = s )",
+                    "|- s = s"
                 )
             )
         }
