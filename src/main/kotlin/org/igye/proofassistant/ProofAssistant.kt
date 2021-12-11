@@ -434,12 +434,12 @@ object ProofAssistant {
         if (hypIdxToMatch == -1) {
             proofAssistantData.substitution.lock()
             proofAssistantData.nonTypeArgs.sortBy { it.numberOfUniqueVars }
-            println("---------------------------------------------------------------")
-            println("begin iterateMatchingHypotheses for ${MetamathUtils.toString(assertion)}")
-            println(subsToStr(proofContext = proofContext, assertion = assertion))
+//            println("---------------------------------------------------------------")
+//            println("begin iterateMatchingHypotheses for ${MetamathUtils.toString(assertion)}")
+//            println(subsToStr(proofContext = proofContext, assertion = assertion))
             iterateMatchingHypotheses(proofContext = proofContext, assertion = assertion, hypIdxToMatch = 0, consumer = consumer)
         } else if (hypIdxToMatch == proofAssistantData.nonTypeArgs.size) {
-            printlnWithPadding(descr = "###################", hypIdxToMatch = hypIdxToMatch)
+//            printlnWithPadding(descr = "###################", hypIdxToMatch = hypIdxToMatch)
             if (!proofAssistantData.substitution.isDefined.all { it }) {
                 throw AssumptionDoesntHoldException()
             }
@@ -452,8 +452,8 @@ object ProofAssistant {
                 if (constParts.size == 0
                     || stmt.value.size >= constParts.remainingMinLength[0] + constParts.begins[0]) {
                     proofAssistantData.substitution.unlock(hypIdxToMatch)
-                    printCurrState(descr = "trying to match hyp with existing node",
-                        proofContext = proofContext, assertion = assertion, hypIdxToMatch = hypIdxToMatch, stmt = stmt)
+//                    printCurrState(descr = "trying to match hyp with existing node",
+//                        proofContext = proofContext, assertion = assertion, hypIdxToMatch = hypIdxToMatch, stmt = stmt)
                     Substitutions.iterateSubstitutions(
                         stmt = stmt.value,
                         asrtStmt = proofAssistantData.nonTypeArgs[hypIdxToMatch].stmt.content,
@@ -463,9 +463,9 @@ object ProofAssistant {
                         varGroups = proofAssistantData.nonTypeArgs[hypIdxToMatch].varGroups,
                         subs = proofAssistantData.substitution.unlock(hypIdxToMatch),
                     ) { subs ->
-                        subs.lock(hypIdxToMatch)
-                        printCurrState(descr = "match found",
-                            proofContext = proofContext, assertion = assertion, hypIdxToMatch = hypIdxToMatch)
+//                        subs.lock(hypIdxToMatch)
+//                        printCurrState(descr = "match found",
+//                            proofContext = proofContext, assertion = assertion, hypIdxToMatch = hypIdxToMatch)
                         iterateMatchingHypotheses(
                             proofContext = proofContext,
                             assertion = assertion,
