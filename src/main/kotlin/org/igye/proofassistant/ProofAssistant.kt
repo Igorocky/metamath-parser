@@ -434,8 +434,12 @@ object ProofAssistant {
         if (hypIdxToMatch == -1) {
             proofAssistantData.substitution.lock()
             proofAssistantData.nonTypeArgs.sortBy { it.numberOfUniqueVars }
+            println("---------------------------------------------------------------")
+            println("begin iterateMatchingHypotheses for ${MetamathUtils.toString(assertion)}")
+            println(subsToStr(proofContext = proofContext, assertion = assertion))
             iterateMatchingHypotheses(proofContext = proofContext, assertion = assertion, hypIdxToMatch = 0, consumer = consumer)
         } else if (hypIdxToMatch == proofAssistantData.nonTypeArgs.size) {
+            println("###################")
             if (!proofAssistantData.substitution.isDefined.all { it }) {
                 throw AssumptionDoesntHoldException()
             }
@@ -447,6 +451,9 @@ object ProofAssistant {
                 val stmt = provedNode.stmt
                 if (constParts.size == 0
                     || stmt.value.size >= constParts.remainingMinLength[0] + constParts.begins[0]) {
+                    proofAssistantData.substitution.unlock(hypIdxToMatch)
+                    printCurrState(descr = "trying to match hyp with existing node",
+                        proofContext = proofContext, assertion = assertion, hypIdxToMatch = hypIdxToMatch, stmt = stmt)
                     Substitutions.iterateSubstitutions(
                         stmt = stmt.value,
                         asrtStmt = proofAssistantData.nonTypeArgs[hypIdxToMatch].stmt.content,
@@ -468,5 +475,37 @@ object ProofAssistant {
                 }
             }
         }
+    }
+
+    private fun printCurrState(
+        descr: String,
+        proofContext: ProofContext,
+        assertion: Assertion,
+        hypIdxToMatch: Int,
+        stmt: Stmt
+    ) {
+        val prefix = "    ".repeat(hypIdxToMatch + 1)
+        val proofAssistantData = assertion.proofAssistantData!!
+        val hypToMatchStr =
+            assertion.visualizationData.stmtToStr(proofAssistantData.nonTypeArgs[hypIdxToMatch].stmt.content)
+        val res = prefix + descr + "\n" +
+                prefix + proofAssistantData.substitution.toString(
+                    varNames = assertion.visualizationData::numToSym,
+                    symbols = proofContext.mmCtx::getSymbolByNumber
+                ) + "\n" +
+                prefix + "hyp = '$hypToMatchStr' stmt = '${stmt.valueStr}'\n"
+        println(res)
+    }
+
+    private fun subsToStr(
+        proofContext: ProofContext,
+        assertion: Assertion,
+    ): String {
+        val proofAssistantData = assertion.proofAssistantData!!
+        val res = proofAssistantData.substitution.toString(
+                    varNames = assertion.visualizationData::numToSym,
+                    symbols = proofContext.mmCtx::getSymbolByNumber
+                )
+        return res
     }
 }

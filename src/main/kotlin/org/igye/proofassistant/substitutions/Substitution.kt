@@ -13,21 +13,35 @@ class Substitution(
     fun isNotLocked(i: Int) = !isLocked(i)
     fun isLocked(i: Int) = locks[i] > -2
 
-    fun unlock(hypIdx: Int = -1): Substitution {
+    fun unlock(level: Int = -1): Substitution {
         for (i in 0 until size) {
-            if (locks[i] >= hypIdx) {
+            if (locks[i] >= level) {
                 locks[i] = -2
             }
         }
         return this
     }
 
-    fun lock(hypIdx: Int = -1): Substitution {
+    fun lock(level: Int = -1): Substitution {
         for (i in 0 until size) {
             if (isDefined[i] && isNotLocked(i)) {
-                locks[i] = hypIdx
+                locks[i] = level
             }
         }
         return this
+    }
+
+    fun toString(varNames: (Int) -> String, symbols: (Int) -> String): String {
+        return begins.indices.asSequence()
+            .filter { isLocked(it) }
+            .map { "${varNames(it)}: ${subExprToString(it, symbols)}" }
+            .joinToString(prefix = "[", separator = " ; ", postfix = "]")
+    }
+
+    private fun subExprToString(i:Int, symbols: (Int) -> String): String {
+        return stmt[i].indices.asSequence()
+            .filter { begins[i] <= it && it <= ends[i] }
+            .map { symbols(stmt[i][it]) }
+            .joinToString(separator = " ")
     }
 }
