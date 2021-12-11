@@ -390,7 +390,7 @@ object ProofAssistant {
                             iterateMatchingHypotheses(proofContext = proofContext, assertion = assertion) { subs2 ->
                                 val subsList = ArrayList<IntArray>(subs2.size)
                                 for (i in 0 until subs2.size) {
-                                    subsList.add(stmt.value.copyOfRange(fromIndex = subs2.begins[i], toIndex = subs2.ends[i] + 1))
+                                    subsList.add(subs2.stmt[i].copyOfRange(fromIndex = subs2.begins[i], toIndex = subs2.ends[i] + 1))
                                 }
                                 for (hyp in assertion.hypotheses) {
                                     if (hyp.type == 'f') {
@@ -439,7 +439,7 @@ object ProofAssistant {
             println(subsToStr(proofContext = proofContext, assertion = assertion))
             iterateMatchingHypotheses(proofContext = proofContext, assertion = assertion, hypIdxToMatch = 0, consumer = consumer)
         } else if (hypIdxToMatch == proofAssistantData.nonTypeArgs.size) {
-            println("###################")
+            printlnWithPadding(descr = "###################", hypIdxToMatch = hypIdxToMatch)
             if (!proofAssistantData.substitution.isDefined.all { it }) {
                 throw AssumptionDoesntHoldException()
             }
@@ -464,6 +464,8 @@ object ProofAssistant {
                         subs = proofAssistantData.substitution.unlock(hypIdxToMatch),
                     ) { subs ->
                         subs.lock(hypIdxToMatch)
+                        printCurrState(descr = "match found",
+                            proofContext = proofContext, assertion = assertion, hypIdxToMatch = hypIdxToMatch)
                         iterateMatchingHypotheses(
                             proofContext = proofContext,
                             assertion = assertion,
@@ -477,12 +479,18 @@ object ProofAssistant {
         }
     }
 
+    private fun printlnWithPadding(descr: String, hypIdxToMatch: Int) {
+        val prefix = "    ".repeat(hypIdxToMatch + 1)
+        val res = prefix + descr + "\n"
+        println(res)
+    }
+
     private fun printCurrState(
         descr: String,
         proofContext: ProofContext,
         assertion: Assertion,
         hypIdxToMatch: Int,
-        stmt: Stmt
+        stmt: Stmt? = null
     ) {
         val prefix = "    ".repeat(hypIdxToMatch + 1)
         val proofAssistantData = assertion.proofAssistantData!!
@@ -493,7 +501,7 @@ object ProofAssistant {
                     varNames = assertion.visualizationData::numToSym,
                     symbols = proofContext.mmCtx::getSymbolByNumber
                 ) + "\n" +
-                prefix + "hyp = '$hypToMatchStr' stmt = '${stmt.valueStr}'\n"
+                if (stmt != null) prefix + "'$hypToMatchStr' should match '${stmt.valueStr}'\n" else ""
         println(res)
     }
 

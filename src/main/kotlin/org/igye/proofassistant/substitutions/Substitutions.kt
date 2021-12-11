@@ -145,13 +145,14 @@ object Substitutions {
             }
             currSubs.isDefined[varNum] = false
         } else {
+            val existingStmt = currSubs.stmt[varNum]
             val existingSubExprBeginIdx = currSubs.begins[varNum]
             val existingSubLength = currSubs.ends[varNum]- existingSubExprBeginIdx +1
             if (existingSubLength <= maxSubExprLength
                 && (currVarIdx < grp.numOfVars-1 || existingSubLength == maxSubExprLength)) {
                 var checkedLength = 0
                 while (checkedLength < existingSubLength
-                    && stmt[existingSubExprBeginIdx+checkedLength] == stmt[subExprBeginIdx+checkedLength]) {
+                    && existingStmt[existingSubExprBeginIdx+checkedLength] == stmt[subExprBeginIdx+checkedLength]) {
                     checkedLength++
                 }
                 if (checkedLength == existingSubLength) {

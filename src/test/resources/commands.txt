@@ -1,3 +1,4 @@
 ./metamath.exe "read set-mod.mm" "verify proof new-asrt" exit
+./metamath.exe "read demo0-without-theorem.mm" "verify proof new-asrt" exit
 
 ./metamath.exe "read set-mod.mm" "show proof new-asrt /all" exit
