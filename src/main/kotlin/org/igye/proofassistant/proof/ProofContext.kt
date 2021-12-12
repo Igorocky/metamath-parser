@@ -50,6 +50,22 @@ class ProofContext(
         node.state = NEW
     }
 
+    fun addProvedStatement(node: ProofNode) {
+        if (!(node is ConstProofNode || node is CalcProofNode)) {
+            throw AssumptionDoesntHoldException()
+        }
+        if (newStatements.contains(node.stmt)) {
+            throw AssumptionDoesntHoldException()
+        }
+        if (waitingStatements.contains(node.stmt)) {
+            throw AssumptionDoesntHoldException()
+        }
+        if (provedStatements.put(node.stmt, node) != null) {
+            throw AssumptionDoesntHoldException()
+        }
+        node.state = PROVED
+    }
+
     fun markWaiting(node: PendingProofNode) {
         val new = newStatements.remove(node.stmt)
         if (new !== null && new !== node) {

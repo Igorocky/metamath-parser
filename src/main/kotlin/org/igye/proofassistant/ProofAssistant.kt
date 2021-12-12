@@ -167,12 +167,20 @@ object ProofAssistant {
         val directAssertionsByPrefix: Map<Int, List<Assertion>> = classifiedAssertions[true]?:emptyMap()
         val indirectAssertionsByPrefix: Map<Int, List<Assertion>> = classifiedAssertions[false]?:emptyMap()
 
-        return ProofContext(
+        val proofContext = ProofContext(
             mmCtx = ctx,
             allTypes = ctx.getHypotheses { it.type == 'f' }.asSequence().map { it.content[0] }.toSet(),
             directAssertionsByPrefix = directAssertionsByPrefix,
             indirectAssertionsByPrefix = indirectAssertionsByPrefix,
         )
+        ctx.iterateHypotheses {
+            if (it.type == 'f' || it.type == 'e') {
+                val stmt = it.content
+                proofContext.addProvedStatement(ConstProofNode(stmt = mkStmt(stmt, ctx), isTypeProof = proofContext.allTypes.contains(stmt[0]), src = it))
+            }
+            CONTINUE
+        }
+        return proofContext
     }
 
     fun prove(expr: String, ctx: MetamathContext): ProofNode {
